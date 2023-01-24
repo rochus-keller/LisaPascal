@@ -1,0 +1,10 @@
+../../Coco/Coco ./LisaPascal.atg -trace FP -o . -namespace Lisa > ./coco_out.txt
+
+mv ./Parser.h ../LisaParser.h
+mv ./Parser.cpp ../LisaParser.cpp
+
+mv ./LisaSynTree.h ..
+mv ./LisaSynTree.cpp ..
+
+mv ./LisaTokenType.h ..
+mv ./LisaTokenType.cpp ..

@@ -1,0 +1,324 @@
+// Copyright 2023 Rochus Keller <mailto:me@rochus-keller.ch> and others
+
+// started with the Pascal EBNF found at https://www.icosaedro.it/bnf_chk/ebnf-pascal.txt
+//   which itself was translated from https://web.archive.org/web/20100411050221/http://www.lrz-muenchen.de/~bernhard/Pascal-EBNF.html
+// Modifications
+// - modified the grammar for compatibility with EbnfStudio
+// - renamed type to type_, label to label_, program to program_ and set to set_literal to avoid collision with keyword
+// - renamed string to string_literal
+// - removed variable_list, output_list, output_value, field_width and fraction_length because unused
+// - replaced left recursive variable, component_variable, referenced_variable, indexed_variable, array_variable, 
+//      record_variable, file_variable, pointer_variable, field_designator and file_buffer by a generic 
+//      thus removed entire_variable, component_variable, indexed_variable, referenced_variable, field_designator, etc.
+//      replaced variable by the variable_reference ::= variable_identifier { qualifier } from the Lisa Pascal spec
+// - extended the syntax by the additional constructs from LisaPascal according to 
+//     "Pascal Reference Manual for the Lisa", Beta Draft April 1983
+// - correlated the whole syntax with appendix C of the said manual and removed constructs not used by Lisa
+// - removed all LL(1) ambiguities
+// - Correction of the syntax according to actual Lisa source code (in deviation from the reference manual). Changes:
+//       added procedure_and_function_interface_part
+//       files can apparently also only contain procedures
+//       added non_regular_unit
+//       NOTE that a preprocessor seems to be required which is the reason why certain files per se don't meet syntax,
+//       or only meet syntax if conditional sections are actively selected or muted and files are included.
+
+// Programs and Blocks
+
+LisaPascal ::= program_ | regular_unit | non_regular_unit
+
+program_ ::= 
+	program_heading ';' [ uses_clause ] block
+	[ statement_part '.' ] // can apparently be left out, as e.g. APDM-DESK
+program_heading ::= 
+	program identifier [ '(' program_parameters ')' ]
+program_parameters ::= identifier_list
+uses_clause ::= uses identifier_list ';'
+
+regular_unit ::= 
+	unit_heading ';' interface_part implementation_part 
+	[ end '.' ] // end can apparently be left out, as done in some files
+unit_heading ::= 
+	unit identifier 
+interface_part ::=
+	interface
+	[ uses_clause ]
+	[ constant_declaration_part ]
+	[ type_declaration_part ]
+	[ variable_declaration_part ]
+	[ procedure_and_function_interface_part ]
+implementation_part ::=
+	implementation
+	[ constant_declaration_part ]
+	[ type_declaration_part ]
+	[ variable_declaration_part ]
+	[ procedure_and_function_declaration_part ]	
+
+non_regular_unit ::=
+	// Coco seems to have an issue with this in that the generated procedure
+	// without the \LA starts with while( la in {procedure,function,end}
+	{ \LA: 1:(procedure|function)\ procedure_and_function_declaration_part }
+	[ statement_part '.' | end '.' ]
+	
+block ::=
+    [ label_declaration_part ]
+    [ constant_declaration_part ]
+    [ type_declaration_part ]
+    [ variable_declaration_part ]
+    [ procedure_and_function_declaration_part ] 
+label_declaration_part ::=
+    label label_ { ',' label_ } ';' 
+label_ ::=
+    digit_sequence 
+constant_declaration_part ::=
+    const constant_declaration  { constant_declaration } 
+constant_declaration ::=
+    identifier '=' constant ';'
+constant ::=
+     [ sign ] (  constant_identifier | unsigned_number ) | string_literal
+type_declaration_part ::=
+    type type_declaration { type_declaration } 
+type_declaration ::=
+    identifier '=' type_  ';'
+variable_declaration_part ::=
+    var variable_declaration  { variable_declaration } 
+variable_declaration ::=
+    identifier_list ':' type_ ';'
+procedure_and_function_interface_part ::=
+    { procedure_heading ';' | function_heading ';' } 
+procedure_and_function_declaration_part ::=
+    { procedure_declaration | function_declaration } 
+procedure_declaration ::=
+    procedure_heading ';' body_ ';'
+body_ ::= // procedure_body, function_body
+    block statement_part | 'forward' | 'external' | 'inline' constant
+function_declaration ::=
+    function_heading ';' body_ ';'
+statement_part ::=
+    compound_statement
+
+// Procedure and Function Definitions
+
+procedure_heading ::=
+    procedure identifier [ formal_parameter_list ] 
+function_heading ::=
+    function identifier [ formal_parameter_list ] 
+	    [':' result_type ] // return type can apparently be left out, as done in some files
+result_type ::=
+    type_identifier // ordinal/real/pointer_type_ident
+formal_parameter_list ::=
+    '(' formal_parameter_section { ';' formal_parameter_section } ')' 
+formal_parameter_section ::=
+    parameter_declaration |
+    procedure_heading |
+    function_heading 
+parameter_declaration ::=
+    [var] identifier_list ':' type_identifier // original Pascal in contrast to Lisa also supports conformant_array_schema
+
+// Statements
+
+statement_sequence ::=
+    statement { ';' statement } 
+statement ::=
+    [ label_ ':' ] ( [simple_statement] | structured_statement) 
+simple_statement ::=
+    // assignment_statement | procedure_statement | goto_statement
+    assigOrCall | goto_statement
+assignment_statement- ::=
+    (variable_reference | function_identifier) ':=' expression 
+assigOrCall ::=
+    variable_reference // covers assig lhs incl. function_identifier 
+     ( ':=' expression   // covers assig rhs
+     |  [ actual_parameter_list ] ) // covers procedure_statement, but only if lhs has no qualifier
+procedure_statement- ::=
+    procedure_identifier [ actual_parameter_list ] 
+goto_statement ::=
+    goto label_
+structured_statement ::=
+    compound_statement | repetitive_statement | conditional_statement | with_statement 
+compound_statement ::=
+    begin statement_sequence end
+repetitive_statement ::=
+    while_statement | repeat_statement | for_statement 
+while_statement ::=
+    while expression do statement 
+repeat_statement ::=
+    repeat statement_sequence until expression 
+for_statement ::=
+    for variable_identifier ':=' initial_value (to | downto) final_value do statement 
+initial_value ::=
+    expression 
+final_value ::=
+    expression 
+conditional_statement ::=
+    if_statement | case_statement 
+if_statement ::=
+    if expression then statement [ else statement ] 
+case_statement ::=
+    case expression of
+	case_limb { \LA: 1: ';' & 2:(!end&!otherwise)\ ';' [case_limb] }  // apparently stray ';' are allowed in case
+	    [ \LL:2\ otherwise_clause ] [ ';' ]
+    end
+case_limb ::=
+    case_label_list ':' statement 
+case_label_list ::=
+    constant { ',' constant } 
+otherwise_clause ::=
+    ';' otherwise statement
+with_statement ::=
+    with variable_reference { ',' variable_reference } do statement  // references a record 
+actual_parameter_list ::=
+    '(' actual_parameter { ',' actual_parameter } ')' 
+actual_parameter ::=
+    expression // included | variable_reference | procedure_identifier | function_identifier 
+
+// Expressions
+
+expression ::=
+    simple_expression [ relational_operator simple_expression ] 
+simple_expression ::=
+    [ sign ] term { addition_operator term } 
+term ::=
+    factor { multiplication_operator factor } 
+factor ::=
+    '@' variable_reference 
+    | identifier ( actual_parameter_list | { qualifier } ) // function_designator, bound_identifier, constant_identifier
+    // Lisa combines unsigned_number, string, constant_identifier and nil to unsigned_constant
+    | unsigned_number 
+    | string_literal
+    | nil
+    | set_literal 
+    | '(' expression ')' 
+    | not factor 
+relational_operator ::=
+    '=' | '<>' | '<' | '<=' | '>' | '>=' | in
+addition_operator ::=
+    '+' | '-' | or
+multiplication_operator ::=
+    '*' | '/' | ':' | div | mod | and // ':' is apparently also supported instead of div
+    
+variable_reference ::= 
+	variable_identifier { qualifier }
+qualifier ::= 
+	index | field_designator | dereferencer
+index ::= 
+	'[' expression_list ']'
+field_designator ::= 
+	'.' field_identifier
+dereferencer ::=  // Lisa: file_buffer_symbol or pointer_object_symbol
+	'^'
+
+set_literal ::= // Lisa: set_constructor
+    '[' [ member_group  { ',' member_group } ] ']' 
+member_group ::=
+    expression [ '..' expression  ] 
+//function_designator ::=
+//    function_identifier [ actual_parameter_list ] 
+
+// Types
+
+type_ ::=
+    simple_type | string_type | structured_type | pointer_type // already includes ident via simple_type subrange_type: | type_identifier  
+    // ident for real_type_ident, ordinal_type_ident, string_type_ident, structured_type_ident and pointer_type_ident
+simple_type ::=
+    \LA: 1:identifier & 2:!'..'\ identifier
+    | subrange_type 
+    | enumerated_type
+ordinal_type ::=
+	simple_type // already includes constant_ident via subrange_type: | type_identifier // for ordinal_type_ident
+string_type ::= string '[' size_attribute ']' 
+size_attribute ::= 
+	unsigned_integer 
+	| identifier // apparently also supported
+enumerated_type ::=
+    '(' identifier_list ')' 
+subrange_type ::=
+    constant ( '..' | ':' ) constant  // ':' apparently is supported too, e.g. in SOURCE-VMSTUFF
+structured_type ::=
+    [ packed ] ( array_type | record_type | set_type | file_type ) 
+array_type ::=
+    array '[' index_type { ',' index_type } ']' of type_ 
+index_type ::=
+    ordinal_type
+set_type ::=
+    set of ordinal_type 
+file_type ::=
+    file of type_ 
+pointer_type ::=
+    '^' type_identifier 
+
+// Records
+
+record_type ::=
+    record [ field_list ] end
+field_list ::=
+    (fixed_part [ \LL:2\ ';' variant_part ] | variant_part) [ ';' ] 
+fixed_part ::=
+    field_declaration { \LL:2\ ';' field_declaration } 
+field_declaration ::=
+    identifier_list ':' type_
+variant_part ::=
+    case [ \LL:2\ tag_field] type_identifier // ordinal_type_ident
+    of variant { \LA: 1:';' & 2:!end\ ';' variant } 
+tag_field ::=
+    identifier ':'
+variant ::=
+    case_label_list ':' '(' [field_list] ')' 
+
+// Variable and Identifier Categories
+
+field_identifier ::=
+    identifier 
+constant_identifier ::=
+    identifier 
+variable_identifier ::=
+    identifier 
+type_identifier ::=
+    identifier 
+procedure_identifier- ::=
+    identifier 
+function_identifier- ::=
+    identifier 
+//bound_identifier ::=
+//    identifier 
+
+// Low Level Definitions
+
+identifier ::= // letter { letter | digit | '_' } 
+// letter ::=  'A' .. 'Z' | 'a' .. 'z'
+// digit ::= '0' .. '9' 
+identifier_list ::=
+    identifier { ',' identifier } 
+expression_list ::=
+    expression { ',' expression } 
+    
+unsigned_integer ::= digit_sequence | hex_digit_sequence
+unsigned_real ::= // digit_sequence [ '.' digit_sequence ] [ scale_factor ]
+// scale_factor ::= ('E' | 'e') [sign] digit_sequence 
+unsigned_number ::= unsigned_integer | unsigned_real
+digit_sequence ::= // digit { digit } 
+hex_digit_sequence ::= // '$' hex_digit { hex_digit }
+// hex_digit ::= digit | 'A'..'F'
+sign ::= '+' | '-' 
+string_literal ::= // ''' string_character { string_character } ''' 
+
+// Helper Tokens
+Comment ::=
+Directive ::=
+comment- ::= '(*' '*)' '{' '}'
+
+// Pragmas
+%module ::= 'LisaPascal'
+%namespace ::= 'Lisa'
+%suppress ::= ';' ',' '.'
+
+// comaring the syntax of Pascal Manual & Report 2nd (1975) and 4th edition
+// - the set of keywords are identical
+
+// comparing the syntax of LisaPascal 1983 with Manual & Report 
+// - LisaPascal added these keywords: creation, implementation, interface, intrinsic, methods, otherwise, string
+//   subclass, unit, uses; no keywords were removed
+
+// Comparing the syntax of LisaPascal Version 3 with Beta 1983
+// - Went through all synatx diagrams in both appendices C
+// - All are identical
+// - the keywords subclass, methods, creation not used
