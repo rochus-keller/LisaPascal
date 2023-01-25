@@ -60,6 +60,7 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_member_group: return "member_group";
 		case R_multiplication_operator: return "multiplication_operator";
 		case R_non_regular_unit: return "non_regular_unit";
+		case R_oostuff_: return "oostuff";
 		case R_ordinal_type: return "ordinal_type";
 		case R_otherwise_clause: return "otherwise_clause";
 		case R_parameter_declaration: return "parameter_declaration";

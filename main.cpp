@@ -18,43 +18,25 @@
 #include <QDir>
 #include <QFile>
 #include <QtDebug>
+#include <QCryptographicHash>
 #include "LisaLexer.h"
 #include "LisaParser.h"
+#include "Converter.h"
 using namespace Lisa;
 
-static QStringList collectFiles( const QDir& dir )
+
+
+static void compareFiles( const QStringList& files, int off )
 {
-    // stats: ("F", 57)("OBJ", 8)("TEXT", 109)("text", 9)("txt", 1092)
-    // *.F -> font
-    // *.OBJ -> object files; source available unless TK-ALERT, TK-NullChange, TK-WorkDir, libtk-passwd and IconEdit
-    // *.TEXT, *.text -> looks like different kinds of sources covered in binary format
-    // *.txt -> Lisa Pascal (614/1092) or assembler source files
-
-    QStringList res;
-    QStringList files = dir.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
-
-    foreach( const QString& f, files )
-        res += collectFiles( QDir( dir.absoluteFilePath(f) ) );
-
-    files = dir.entryList( QStringList() << "*.txt", QDir::Files, QDir::Name );
     foreach( const QString& f, files )
     {
-        QFile in(dir.absoluteFilePath(f));
-        if( !in.open(QIODevice::ReadOnly) )
-        {
-            qCritical() << "cannot open file for reading:" << f;
-            continue;
-        }
-        Lexer lex;
-        lex.setStream(&in);
-        lex.setIgnoreComments(false);
-        Token t = lex.nextToken();
-        if( t.d_type == Tok_Comment || t.d_type == Tok_program || t.d_type == Tok_unit ||
-                t.d_type == Tok_procedure || t.d_type == Tok_function )
-            res.append( in.fileName() );
-        // else qDebug() << "** Not Pascal: " << in.fileName();
+        QCryptographicHash hash(QCryptographicHash::Md5);
+        QFile in(f);
+        in.open(QIODevice::ReadOnly);
+        hash.addData(in.readAll());
+        QFileInfo info(f);
+        qDebug() << f.mid(off) << "\t" << info.fileName().toLower() << "\t" << hash.result().toHex();
     }
-    return res;
 }
 
 int main(int argc, char *argv[])
@@ -63,19 +45,31 @@ int main(int argc, char *argv[])
 
     if( a.arguments().size() <= 1 )
         return -1;
-
+#if 0
+    QFileInfo info(a.arguments()[1]);
+    if( info.isDir() )
+    {
+        QDir from = info.dir();
+        QDir to( from.path() + "/converted" );
+        Converter::convert(from,to);
+    }
+#else
     QStringList files;
 
     int off = 0;
     QFileInfo info(a.arguments()[1]);
     if( info.isDir() )
     {
-        files = collectFiles(a.arguments()[1]);
+        files = Converter::collectFiles(info.dir(),"*.pas");
         off = a.arguments()[1].size();
     }else
         files << a.arguments()[1];
 
+#if 0
+    compareFiles(files,off);
+#else
     int ok = 0;
+    QMap<QByteArray,int> count;
     foreach( const QString& file, files )
     {
         QFile in(file);
@@ -84,10 +78,9 @@ int main(int argc, char *argv[])
             qCritical() << "cannot open file for reading:" << file;
             return -1;
         }
-        qDebug() << "**** parsing" << file.mid(off);
         Lexer lex;
         lex.setStream(&in);
-    #if 0
+#if 0
         lex.setIgnoreComments(false);
         Token t = lex.nextToken();
         while(t.isValid())
@@ -95,8 +88,10 @@ int main(int argc, char *argv[])
             qDebug() << tokenTypeName(t.d_type) << t.d_lineNr << t.d_colNr << t.d_val;
             t = lex.nextToken();
         }
-    #else
+#else
         Parser p(&lex);
+#if 1
+        qDebug() << "**** parsing" << file.mid(off);
         p.RunParser();
         if( !p.errors.isEmpty() )
         {
@@ -107,8 +102,33 @@ int main(int argc, char *argv[])
             ok++;
             qDebug() << "ok";
         }
+#else
+        lex.setStream(&in);
+        lex.setIgnoreComments(false);
+        Token t = lex.nextToken();
+        while(t.isValid())
+        {
+            if( t.d_type == Tok_Comment && t.d_val.startsWith("{$") )
+            {
+                const int pos = t.d_val.indexOf(' ');
+                if( pos >= 0 )
+                {
+                    const QByteArray d = t.d_val.left(pos).mid(2).toUpper();
+                    count[d]++;
+                    if( d == "I" )
+                        qDebug() << "***" << in.fileName().mid(off) << "includes" <<
+                                    t.d_val.left(t.d_val.size()-1).mid(pos).trimmed();
+                }
+            }
+            t = lex.nextToken();
+        }
+
+#endif
     }
 #endif
+    qDebug() << count;
     qDebug() << "#### finished with" << ok << "files ok of total" << files.size() << "files";
+#endif
+#endif
     return 0;
 }

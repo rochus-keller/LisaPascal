@@ -36,6 +36,7 @@ namespace Lisa {
 			case Tok_begin: return "begin";
 			case Tok_case: return "case";
 			case Tok_const: return "const";
+			case Tok_creation: return "creation";
 			case Tok_div: return "div";
 			case Tok_do: return "do";
 			case Tok_downto: return "downto";
@@ -53,6 +54,7 @@ namespace Lisa {
 			case Tok_inline: return "inline";
 			case Tok_interface: return "interface";
 			case Tok_label: return "label";
+			case Tok_methods: return "methods";
 			case Tok_mod: return "mod";
 			case Tok_nil: return "nil";
 			case Tok_not: return "not";
@@ -66,6 +68,7 @@ namespace Lisa {
 			case Tok_repeat: return "repeat";
 			case Tok_set: return "set";
 			case Tok_string: return "string";
+			case Tok_subclass: return "subclass";
 			case Tok_then: return "then";
 			case Tok_to: return "to";
 			case Tok_type: return "type";
@@ -120,6 +123,7 @@ namespace Lisa {
 			case Tok_begin: return "Tok_begin";
 			case Tok_case: return "Tok_case";
 			case Tok_const: return "Tok_const";
+			case Tok_creation: return "Tok_creation";
 			case Tok_div: return "Tok_div";
 			case Tok_do: return "Tok_do";
 			case Tok_downto: return "Tok_downto";
@@ -137,6 +141,7 @@ namespace Lisa {
 			case Tok_inline: return "Tok_inline";
 			case Tok_interface: return "Tok_interface";
 			case Tok_label: return "Tok_label";
+			case Tok_methods: return "Tok_methods";
 			case Tok_mod: return "Tok_mod";
 			case Tok_nil: return "Tok_nil";
 			case Tok_not: return "Tok_not";
@@ -150,6 +155,7 @@ namespace Lisa {
 			case Tok_repeat: return "Tok_repeat";
 			case Tok_set: return "Tok_set";
 			case Tok_string: return "Tok_string";
+			case Tok_subclass: return "Tok_subclass";
 			case Tok_then: return "Tok_then";
 			case Tok_to: return "Tok_to";
 			case Tok_type: return "Tok_type";
@@ -310,6 +316,21 @@ namespace Lisa {
 					if( at(str,i+3) == 's' ){
 						if( at(str,i+4) == 't' ){
 							res = Tok_const; i += 5;
+						}
+					}
+				}
+				break;
+			case 'r':
+				if( at(str,i+2) == 'e' ){
+					if( at(str,i+3) == 'a' ){
+						if( at(str,i+4) == 't' ){
+							if( at(str,i+5) == 'i' ){
+								if( at(str,i+6) == 'o' ){
+									if( at(str,i+7) == 'n' ){
+										res = Tok_creation; i += 8;
+									}
+								}
+							}
 						}
 					}
 				}
@@ -496,10 +517,25 @@ namespace Lisa {
 			}
 			break;
 		case 'm':
-			if( at(str,i+1) == 'o' ){
+			switch( at(str,i+1) ){
+			case 'e':
+				if( at(str,i+2) == 't' ){
+					if( at(str,i+3) == 'h' ){
+						if( at(str,i+4) == 'o' ){
+							if( at(str,i+5) == 'd' ){
+								if( at(str,i+6) == 's' ){
+									res = Tok_methods; i += 7;
+								}
+							}
+						}
+					}
+				}
+				break;
+			case 'o':
 				if( at(str,i+2) == 'd' ){
 					res = Tok_mod; i += 3;
 				}
+				break;
 			}
 			break;
 		case 'n':
@@ -623,6 +659,21 @@ namespace Lisa {
 						if( at(str,i+4) == 'n' ){
 							if( at(str,i+5) == 'g' ){
 								res = Tok_string; i += 6;
+							}
+						}
+					}
+				}
+				break;
+			case 'u':
+				if( at(str,i+2) == 'b' ){
+					if( at(str,i+3) == 'c' ){
+						if( at(str,i+4) == 'l' ){
+							if( at(str,i+5) == 'a' ){
+								if( at(str,i+6) == 's' ){
+									if( at(str,i+7) == 's' ){
+										res = Tok_subclass; i += 8;
+									}
+								}
 							}
 						}
 					}

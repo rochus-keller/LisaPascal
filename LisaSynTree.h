@@ -61,6 +61,7 @@ namespace Lisa {
 			R_member_group,
 			R_multiplication_operator,
 			R_non_regular_unit,
+			R_oostuff_,
 			R_ordinal_type,
 			R_otherwise_clause,
 			R_parameter_declaration,

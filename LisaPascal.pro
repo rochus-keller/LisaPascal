@@ -14,11 +14,13 @@ SOURCES += main.cpp \
     LisaLexer.cpp \
     LisaParser.cpp \
     LisaSynTree.cpp \
-    LisaTokenType.cpp
+    LisaTokenType.cpp \
+    Converter.cpp
 
 HEADERS += \
     LisaLexer.h \
     LisaParser.h \
     LisaSynTree.h \
     LisaToken.h \
-    LisaTokenType.h
+    LisaTokenType.h \
+    Converter.h

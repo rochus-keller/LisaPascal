@@ -41,3 +41,6 @@ uses
 var
 while
 with
+subclass
+methods
+creation
