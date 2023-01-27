@@ -11,7 +11,7 @@
 namespace Lisa {
 
 
-class Lexer;
+class PpLexer;
 class Parser {
 private:
 	enum {
@@ -113,23 +113,25 @@ private:
 	bool StartOf(int s);
 	void ExpectWeak(int n, int follow);
 	bool WeakSeparator(int n, int syFol, int repFol);
-    void SynErr(int line, int col, int n, const char* ctx, const QString& = QString() );
+    void SynErr(int line, int col, int n, const char* ctx, const QString&, const QString& path );
 
 public:
-	Lexer *scanner;
+	PpLexer *scanner;
 	struct Error
 	{
 		QString msg;
 		int row, col;
+		QString path;
 	};
 	QList<Error> errors;
 	
-	void error(int row, int col, const QString& msg)
+	void error(int row, int col, const QString& msg, const QString& path)
 	{
 		Error e;
 		e.row = row;
 		e.col = col;
 		e.msg = msg;
+		e.path = path;
 		errors.append(e);
 	}
 
@@ -158,7 +160,7 @@ Lisa::SynTree d_root;
 
 
 
-	Parser(Lexer *scanner);
+	Parser(PpLexer *scanner);
 	~Parser();
 	void SemErr(const char* msg);
 

@@ -30,12 +30,13 @@ Lexer::~Lexer()
 {
 }
 
-void Lexer::setStream(QIODevice* in)
+void Lexer::setStream(QIODevice* in, const QString& filePath)
 {
     d_in = in;
     d_lineNr = 0;
     d_colNr = 0;
     d_lastToken = Tok_Invalid;
+    d_filePath = filePath;
 }
 
 Token Lexer::nextToken()
@@ -165,6 +166,7 @@ Token Lexer::token(TokenType tt, int len, const QByteArray& val)
     Token t( tt, d_lineNr, d_colNr + 1, val );
     d_lastToken = t;
     d_colNr += len;
+    t.d_sourcePath = d_filePath;
     return t;
 }
 
@@ -313,12 +315,14 @@ Token Lexer::comment(bool brace)
     {
         d_colNr = d_line.size();
         Token t( Tok_Invalid, startLine, startCol + 1, "non-terminated comment" );
+        t.d_sourcePath = d_filePath;
         return t;
     }
     // Col + 1 weil wir immer bei Spalte 1 beginnen, nicht bei Spalte 0
     Token t( ( d_packComments ? Tok_Comment : Tok_Latt ), startLine, startCol + 1, str );
     d_lastToken = t;
     d_colNr = pos;
+    t.d_sourcePath = d_filePath;
     return t;
 }
 

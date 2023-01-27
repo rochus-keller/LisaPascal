@@ -30,7 +30,8 @@ public:
     Lexer();
     ~Lexer();
 
-    void setStream(QIODevice*);
+    void setStream(QIODevice*, const QString& filePath = QString());
+    QIODevice* getDevice() const { return d_in; }
     void setIgnoreComments( bool b ) { d_ignoreComments = b; }
     void setPackComments( bool b ) { d_packComments = b; }
 
@@ -55,6 +56,7 @@ private:
     QByteArray d_line;
     QList<Token> d_buffer;
     Token d_lastToken;
+    QString d_filePath;
     bool d_ignoreComments;  // don't deliver comment tokens
     bool d_packComments;    // Only deliver one Tok_Comment for /**/ instead of Tok_Lcmt and Tok_Rcmt
 };

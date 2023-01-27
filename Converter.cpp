@@ -25,8 +25,14 @@ using namespace Lisa;
 // *.TEXT, *.text -> looks like different kinds of sources covered in binary format
 // *.txt -> Lisa Pascal (614/1092) or assembler source files
 
+// NOTES:
+// both (*$ and {$ are used for directives
+// there are no $DECL in files categorized as .inc;
+//   but there are a lot of $IFC in .inc files (even $I in two cases);
+//   we can assume that the decls of the including file also apply to included files
+// each pascal file has the suffix "text.unix.txt" with no exception
 
-QStringList Converter::collectFiles( const QDir& dir, const QString& suffix )
+QStringList Converter::collectFiles( const QDir& dir, const QStringList& suffix )
 {
     QStringList res;
     QStringList files = dir.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
@@ -34,7 +40,7 @@ QStringList Converter::collectFiles( const QDir& dir, const QString& suffix )
     foreach( const QString& f, files )
         res += collectFiles( QDir( dir.absoluteFilePath(f) ), suffix );
 
-    files = dir.entryList( QStringList() << suffix, QDir::Files, QDir::Name );
+    files = dir.entryList( suffix, QDir::Files, QDir::Name );
     foreach( const QString& f, files )
     {
         res.append(dir.absoluteFilePath(f));
@@ -42,8 +48,7 @@ QStringList Converter::collectFiles( const QDir& dir, const QString& suffix )
     return res;
 }
 
-enum { Unknown, FullUnit, PartialUnit, AnyPascal };
-static int detectPascal( QIODevice* in )
+int Converter::detectPascal( QIODevice* in )
 {
     Q_ASSERT(in->reset());
     Lexer lex;
@@ -77,7 +82,7 @@ static int detectPascal( QIODevice* in )
     return res;
 }
 
-static bool detectAsm( QIODevice* in )
+bool Converter::detectAsm( QIODevice* in )
 {
     Q_ASSERT(in->reset());
     int lastSemi = -1;
@@ -118,7 +123,7 @@ static bool detectAsm( QIODevice* in )
     return semiStretch || mnemonic;
 }
 
-static bool detectScript(QIODevice* in )
+bool Converter::detectScript(QIODevice* in )
 {
     Q_ASSERT(in->reset());
     const QByteArray line = in->readLine().trimmed().toUpper();
@@ -138,7 +143,7 @@ static bool detectScript(QIODevice* in )
 bool Converter::convert(const QDir& fromDir, const QDir& toDir)
 {
     const int off = fromDir.path().size();
-    const QStringList files = collectFiles(fromDir, "*.txt");
+    const QStringList files = collectFiles(fromDir, QStringList() << "*.txt");
     foreach( const QString& f, files )
     {
         QString newFilePath = toDir.absoluteFilePath(f.mid(off+1).toLower());

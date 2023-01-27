@@ -1,5 +1,5 @@
-#ifndef CONVERTER_H
-#define CONVERTER_H
+#ifndef PPLEXER_H
+#define PPLEXER_H
 
 /*
 ** Copyright (C) 2023 Rochus Keller (me@rochus-keller.ch)
@@ -17,25 +17,34 @@
 ** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 */
 
-#include <QStringList>
-#include <QDir>
+#include "FileSystem.h"
+#include "LisaLexer.h"
+
+class QIODevice;
 
 namespace Lisa
 {
-class Converter
+class FileSystem;
+
+class PpLexer
 {
 public:
-    Converter();
-    static QStringList collectFiles(const QDir& dir , const QStringList& suffix);
-    static bool convert( const QDir& fromDir, const QDir& toDir );
+    PpLexer(FileSystem*);
+    ~PpLexer();
 
-    enum { Unknown, FullUnit, PartialUnit, AnyPascal };
-    static int detectPascal( QIODevice* in );
-    static bool detectAsm( QIODevice* in );
-    static bool detectScript(QIODevice* in );
+    bool reset(const QString& filePath);
+
+    Token nextToken();
+    Token peekToken(quint8 lookAhead = 1);
+protected:
+    Token nextTokenImp();
+
 private:
-
+    FileSystem* d_fs;
+    QList<Lexer> d_stack;
+    QList<QIODevice*> d_files;
+    QList<Token> d_buffer;
 };
 }
 
-#endif // CONVERTER_H
+#endif // PPLEXER_H

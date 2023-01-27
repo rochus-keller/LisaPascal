@@ -15,7 +15,9 @@ SOURCES += main.cpp \
     LisaParser.cpp \
     LisaSynTree.cpp \
     LisaTokenType.cpp \
-    Converter.cpp
+    Converter.cpp \
+    FileSystem.cpp \
+    PpLexer.cpp
 
 HEADERS += \
     LisaLexer.h \
@@ -23,4 +25,6 @@ HEADERS += \
     LisaSynTree.h \
     LisaToken.h \
     LisaTokenType.h \
-    Converter.h
+    Converter.h \
+    FileSystem.h \
+    PpLexer.h
