@@ -34,6 +34,7 @@ namespace Lisa
 #else
         quint16 d_type; // TokenType
 #endif
+        quint8 d_len;
         enum { ROW_BIT_LEN = 19, COL_BIT_LEN = 32 - ROW_BIT_LEN };
         quint32 d_lineNr : ROW_BIT_LEN;
         quint32 d_colNr : COL_BIT_LEN;
@@ -41,7 +42,7 @@ namespace Lisa
 
         QByteArray d_val; // using raw utf8 values pointing to buffered file content
         Token(quint16 t = Tok_Invalid, quint32 line = 0, quint16 col = 0, const QByteArray& val = QByteArray()):
-            d_type(t), d_lineNr(line),d_colNr(col),d_val(val){}
+            d_type(t), d_lineNr(line),d_colNr(col),d_val(val),d_len(0){}
         bool isValid() const { return d_type != Tok_Eof && d_type != Tok_Invalid; }
     };
 }

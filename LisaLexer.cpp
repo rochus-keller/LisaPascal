@@ -166,6 +166,7 @@ Token Lexer::token(TokenType tt, int len, const QByteArray& val)
     Token t( tt, d_lineNr, d_colNr + 1, val );
     d_lastToken = t;
     d_colNr += len;
+    t.d_len = len;
     t.d_sourcePath = d_filePath;
     return t;
 }
@@ -319,7 +320,7 @@ Token Lexer::comment(bool brace)
         return t;
     }
     // Col + 1 weil wir immer bei Spalte 1 beginnen, nicht bei Spalte 0
-    Token t( ( d_packComments ? Tok_Comment : Tok_Latt ), startLine, startCol + 1, str );
+    Token t( ( d_packComments ? Tok_Comment : ( brace ? Tok_Lbrace : Tok_Latt ) ), startLine, startCol + 1, str );
     d_lastToken = t;
     d_colNr = pos;
     t.d_sourcePath = d_filePath;

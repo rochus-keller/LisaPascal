@@ -58,6 +58,7 @@ public:
     bool load( const QString& rootDir );
     const QString& getError() const { return d_error; }
     const Dir& getRoot() const { return d_root; }
+    const QString& getRootPath() const { return d_rootDir; }
     QList<const File*> getAllPas() const;
     const File* findFile(const QString& realPath) const;
     const File* findFile(const Dir* startFrom, const QString& dir, const QString& name) const;

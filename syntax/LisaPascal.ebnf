@@ -305,7 +305,7 @@ string_literal ::= // ''' string_character { string_character } '''
 Comment ::=
 Directive ::=
 comment- ::= '(*' '*)' '{' '}'
-oostuff- ::= methods subclass creation
+oostuff- ::= methods subclass creation intrinsic
 
 // Pragmas
 %module ::= 'LisaPascal'

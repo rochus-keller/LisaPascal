@@ -53,6 +53,7 @@ namespace Lisa {
 			case Tok_in: return "in";
 			case Tok_inline: return "inline";
 			case Tok_interface: return "interface";
+			case Tok_intrinsic: return "intrinsic";
 			case Tok_label: return "label";
 			case Tok_methods: return "methods";
 			case Tok_mod: return "mod";
@@ -140,6 +141,7 @@ namespace Lisa {
 			case Tok_in: return "Tok_in";
 			case Tok_inline: return "Tok_inline";
 			case Tok_interface: return "Tok_interface";
+			case Tok_intrinsic: return "Tok_intrinsic";
 			case Tok_label: return "Tok_label";
 			case Tok_methods: return "Tok_methods";
 			case Tok_mod: return "Tok_mod";
@@ -484,7 +486,8 @@ namespace Lisa {
 					}
 					break;
 				case 't':
-					if( at(str,i+3) == 'e' ){
+					switch( at(str,i+3) ){
+					case 'e':
 						if( at(str,i+4) == 'r' ){
 							if( at(str,i+5) == 'f' ){
 								if( at(str,i+6) == 'a' ){
@@ -496,6 +499,20 @@ namespace Lisa {
 								}
 							}
 						}
+						break;
+					case 'r':
+						if( at(str,i+4) == 'i' ){
+							if( at(str,i+5) == 'n' ){
+								if( at(str,i+6) == 's' ){
+									if( at(str,i+7) == 'i' ){
+										if( at(str,i+8) == 'c' ){
+											res = Tok_intrinsic; i += 9;
+										}
+									}
+								}
+							}
+						}
+						break;
 					}
 					break;
 				default:

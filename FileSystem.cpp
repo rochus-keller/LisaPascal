@@ -45,6 +45,22 @@ static QString replaceLast(const QString& path, const QString& newLast )
     return segs.join('/');
 }
 
+static QStringList collectFiles( const QDir& dir, const QStringList& suffix )
+{
+    QStringList res;
+    QStringList files = dir.entryList( QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name );
+
+    foreach( const QString& f, files )
+        res += collectFiles( QDir( dir.absoluteFilePath(f) ), suffix );
+
+    files = dir.entryList( suffix, QDir::Files, QDir::Name );
+    foreach( const QString& f, files )
+    {
+        res.append(dir.absoluteFilePath(f));
+    }
+    return res;
+}
+
 bool FileSystem::load(const QString& rootDir)
 {
     if( !QFileInfo(rootDir).isDir() )
@@ -53,7 +69,7 @@ bool FileSystem::load(const QString& rootDir)
     d_root.clear();
     d_map.clear();
 
-    const QStringList files = Converter::collectFiles(rootDir,QStringList() << "*.txt");
+    const QStringList files = collectFiles(rootDir,QStringList() << "*.txt");
     const int off = rootDir.size();
 
     foreach( const QString& f, files )
@@ -68,7 +84,7 @@ bool FileSystem::load(const QString& rootDir)
 
         QFileInfo info(f);
 
-        const QString relDirPath = info.absolutePath().mid(off);
+        const QString relDirPath = info.absolutePath().mid(off+1);
         const QString fileName = info.fileName().toLower();
 
         QString name;

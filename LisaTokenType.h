@@ -60,6 +60,7 @@ namespace Lisa {
 		Tok_in,
 		Tok_inline,
 		Tok_interface,
+		Tok_intrinsic,
 		Tok_label,
 		Tok_methods,
 		Tok_mod,
