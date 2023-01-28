@@ -18,11 +18,13 @@
 */
 
 #include "LisaCodeModel.h"
-
+#include "PpLexer.h"
+#include "LisaParser.h"
 #include <QPixmap>
+#include <QtDebug>
 using namespace Lisa;
 
-CodeModel::CodeModel(QObject *parent) : QAbstractItemModel(parent)
+CodeModel::CodeModel(QObject *parent) : QAbstractItemModel(parent),d_sloc(0)
 {
     d_fs = new FileSystem(this);
 }
@@ -33,13 +35,14 @@ bool CodeModel::load(const QString& rootDir)
     d_root = Slot();
     d_top.clear();
     d_map.clear();
+    d_sloc = 0;
     d_fs->load(rootDir);
     QList<Slot*> fileSlots;
     fillFolders(&d_root,&d_fs->getRoot(), &d_top, fileSlots);
     QList<const FileSystem::File*> files = d_fs->getAllPas();
-    foreach( const FileSystem::File* file, files )
-        parseAndResolve(file);
     fillTop();
+    foreach( const FileSystem::File* f, files )
+        parseAndResolve(f);
     endResetModel();
     return true;
 }
@@ -142,6 +145,26 @@ void CodeModel::parseAndResolve(const FileSystem::File* file)
     const QString path = file->getVirtualPath();
     if( d_map.contains(path) )
         return;
+
+    PpLexer lex(d_fs);
+    lex.reset(file->d_realPath);
+    Parser p(&lex);
+    p.RunParser();
+    const int off = d_fs->getRootPath().size();
+    if( !p.errors.isEmpty() )
+    {
+        foreach( const Parser::Error& e, p.errors )
+        {
+            const FileSystem::File* f = d_fs->findFile(e.path);
+            const QString line = tr("%1:%2:%3: %4").arg( f ? f->getVirtualPath() : e.path.mid(off) ).arg(e.row)
+                    .arg(e.col).arg(e.msg);
+            qCritical() << line.toUtf8().constData();
+        }
+
+    }
+    d_sloc += lex.getSloc();
+
+    // TODO resolve syntree and import uses
 }
 
 void CodeModel::fillTop()
@@ -201,6 +224,12 @@ Scope::~Scope()
 {
     for( int i = 0; i < d_order.size(); i++ )
         delete d_order[i];
+}
+
+CodeFile*Declaration::getCodeFile() const
+{
+    Q_ASSERT( d_owner != 0 );
+    return d_owner->getCodeFile();
 }
 
 Declaration::~Declaration()

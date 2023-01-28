@@ -22,13 +22,14 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_case_label_list: return "case_label_list";
 		case R_case_limb: return "case_limb";
 		case R_case_statement: return "case_statement";
+		case R_class_type: return "class_type";
 		case R_comment_: return "comment";
 		case R_compound_statement: return "compound_statement";
 		case R_conditional_statement: return "conditional_statement";
 		case R_constant: return "constant";
 		case R_constant_declaration: return "constant_declaration";
 		case R_constant_declaration_part: return "constant_declaration_part";
-		case R_constant_identifier: return "constant_identifier";
+		case R_constant_identifier_: return "constant_identifier";
 		case R_dereferencer: return "dereferencer";
 		case R_enumerated_type: return "enumerated_type";
 		case R_expression: return "expression";
@@ -49,6 +50,7 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_function_identifier_: return "function_identifier";
 		case R_goto_statement: return "goto_statement";
 		case R_identifier_list: return "identifier_list";
+		case R_identifier_list2: return "identifier_list2";
 		case R_if_statement: return "if_statement";
 		case R_implementation_part: return "implementation_part";
 		case R_index: return "index";
@@ -58,9 +60,10 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_label_: return "label_";
 		case R_label_declaration_part: return "label_declaration_part";
 		case R_member_group: return "member_group";
+		case R_method_block: return "method_block";
+		case R_method_interface: return "method_interface";
 		case R_multiplication_operator: return "multiplication_operator";
 		case R_non_regular_unit: return "non_regular_unit";
-		case R_oostuff_: return "oostuff";
 		case R_ordinal_type: return "ordinal_type";
 		case R_otherwise_clause: return "otherwise_clause";
 		case R_parameter_declaration: return "parameter_declaration";
@@ -95,6 +98,7 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_structured_statement: return "structured_statement";
 		case R_structured_type: return "structured_type";
 		case R_subrange_type: return "subrange_type";
+		case R_subroutine_part: return "subroutine_part";
 		case R_tag_field: return "tag_field";
 		case R_term: return "term";
 		case R_type_: return "type_";

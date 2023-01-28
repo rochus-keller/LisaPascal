@@ -21,7 +21,7 @@ using namespace Lisa;
 
 Lexer::Lexer():
     d_lastToken(Tok_Invalid),d_lineNr(0),d_colNr(0),d_in(0),
-    d_ignoreComments(true), d_packComments(true)
+    d_ignoreComments(true), d_packComments(true),d_sloc(0),d_lineCounted(false)
 {
 
 }
@@ -37,6 +37,8 @@ void Lexer::setStream(QIODevice* in, const QString& filePath)
     d_colNr = 0;
     d_lastToken = Tok_Invalid;
     d_filePath = filePath;
+    d_sloc = 0;
+    d_lineCounted = false;
 }
 
 Token Lexer::nextToken()
@@ -109,7 +111,9 @@ Token Lexer::nextTokenImp()
         else if( ch == '$')
             return hexnumber();
         else if( ::isalpha(ch) ||
-                 ch == '%' ) // apparently supported, e.g. in libpl-BLOCKIO2.TEXT.unix.txt
+                 ch == '%' || ch == '_' )
+                    // leading % apparently supported, e.g. in libpl-BLOCKIO2.TEXT.unix.txt
+                    // leading _ apparently supported, e.g. in libdb-HEAP.TEXT.unix.txt
             return ident();
         else if( ::isdigit(ch) )
             return number();
@@ -145,6 +149,7 @@ void Lexer::nextLine()
     d_colNr = 0;
     d_lineNr++;
     d_line = d_in->readLine();
+    d_lineCounted = false;
 
     if( d_line.endsWith("\r\n") )
         d_line.chop(2);
@@ -163,6 +168,8 @@ int Lexer::lookAhead(int off) const
 
 Token Lexer::token(TokenType tt, int len, const QByteArray& val)
 {
+    if( tt != Tok_Invalid && tt != Tok_Comment && tt != Tok_Eof )
+        countLine();
     Token t( tt, d_lineNr, d_colNr + 1, val );
     d_lastToken = t;
     d_colNr += len;
@@ -177,7 +184,8 @@ Token Lexer::ident()
     while( true )
     {
         const char c = lookAhead(off);
-        if( !QChar(c).isLetterOrNumber() && c != '_' ) // QChar wegen möglichen Umlauten
+        if( !::isalnum(c) && c != '_' && c != '%' )
+            // % in ident apparently supported, as seen in libfp-FPMODES.TEXT.unix.txt
             break;
         else
             off++;
@@ -239,7 +247,10 @@ Token Lexer::number()
         off++;
         char o = lookAhead(off);
         if( o == '+' || o == '-' )
+        {
             off++;
+            o = lookAhead(off);
+        }
         if( !::isdigit(o) )
             return token( Tok_Invalid, off, "invalid real, digit expected after exponent" );
         while( true )
@@ -346,4 +357,11 @@ Token Lexer::string()
     }
     const QByteArray str = d_line.mid(d_colNr, off );
     return token( Tok_string_literal, off, str );
+}
+
+void Lexer::countLine()
+{
+    if( !d_lineCounted )
+        d_sloc++;
+    d_lineCounted = true;
 }

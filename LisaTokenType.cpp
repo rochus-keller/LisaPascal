@@ -36,7 +36,6 @@ namespace Lisa {
 			case Tok_begin: return "begin";
 			case Tok_case: return "case";
 			case Tok_const: return "const";
-			case Tok_creation: return "creation";
 			case Tok_div: return "div";
 			case Tok_do: return "do";
 			case Tok_downto: return "downto";
@@ -68,6 +67,7 @@ namespace Lisa {
 			case Tok_record: return "record";
 			case Tok_repeat: return "repeat";
 			case Tok_set: return "set";
+			case Tok_shared: return "shared";
 			case Tok_string: return "string";
 			case Tok_subclass: return "subclass";
 			case Tok_then: return "then";
@@ -124,7 +124,6 @@ namespace Lisa {
 			case Tok_begin: return "Tok_begin";
 			case Tok_case: return "Tok_case";
 			case Tok_const: return "Tok_const";
-			case Tok_creation: return "Tok_creation";
 			case Tok_div: return "Tok_div";
 			case Tok_do: return "Tok_do";
 			case Tok_downto: return "Tok_downto";
@@ -156,6 +155,7 @@ namespace Lisa {
 			case Tok_record: return "Tok_record";
 			case Tok_repeat: return "Tok_repeat";
 			case Tok_set: return "Tok_set";
+			case Tok_shared: return "Tok_shared";
 			case Tok_string: return "Tok_string";
 			case Tok_subclass: return "Tok_subclass";
 			case Tok_then: return "Tok_then";
@@ -318,21 +318,6 @@ namespace Lisa {
 					if( at(str,i+3) == 's' ){
 						if( at(str,i+4) == 't' ){
 							res = Tok_const; i += 5;
-						}
-					}
-				}
-				break;
-			case 'r':
-				if( at(str,i+2) == 'e' ){
-					if( at(str,i+3) == 'a' ){
-						if( at(str,i+4) == 't' ){
-							if( at(str,i+5) == 'i' ){
-								if( at(str,i+6) == 'o' ){
-									if( at(str,i+7) == 'n' ){
-										res = Tok_creation; i += 8;
-									}
-								}
-							}
 						}
 					}
 				}
@@ -668,6 +653,17 @@ namespace Lisa {
 			case 'e':
 				if( at(str,i+2) == 't' ){
 					res = Tok_set; i += 3;
+				}
+				break;
+			case 'h':
+				if( at(str,i+2) == 'a' ){
+					if( at(str,i+3) == 'r' ){
+						if( at(str,i+4) == 'e' ){
+							if( at(str,i+5) == 'd' ){
+								res = Tok_shared; i += 6;
+							}
+						}
+					}
 				}
 				break;
 			case 't':

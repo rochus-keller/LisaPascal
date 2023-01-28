@@ -21,8 +21,11 @@
 //       added non_regular_unit
 //       NOTE that a preprocessor seems to be required which is the reason why certain files per se don't meet syntax,
 //       or only meet syntax if conditional sections are actively selected or muted and files are included.
+// - Added Clascal syntax from spec; modified as long as compatible with the Lisa source code 
 
 // Programs and Blocks
+
+#define CLASCAL
 
 LisaPascal ::= program_ | regular_unit | non_regular_unit
 
@@ -32,26 +35,34 @@ program_ ::=
 program_heading ::= 
 	program identifier [ '(' program_parameters ')' ]
 program_parameters ::= identifier_list
-uses_clause ::= uses identifier_list ';'
+uses_clause ::= uses identifier_list2 ';'
+identifier_list2 ::=
+	identifier [ '/' identifier ] { ',' identifier [ '/' identifier ] }  // apparently legal, seen e.g. in libhw/keyboard
 
 regular_unit ::= 
-	unit_heading ';' interface_part implementation_part 
+	unit_heading ';' [ intrinsic [shared] ';' ] // apparently the sources deviate from the spec for intrinsic
+		interface_part implementation_part 
 	[ end '.' ] // end can apparently be left out, as done in some files
 unit_heading ::= 
 	unit identifier 
 interface_part ::=
 	interface
 	[ uses_clause ]
-	[ constant_declaration_part ]
-	[ type_declaration_part ]
-	[ variable_declaration_part ]
-	[ procedure_and_function_interface_part ]
+	{ ( constant_declaration_part 
+	| type_declaration_part
+	| variable_declaration_part
+	| procedure_and_function_interface_part ) }
 implementation_part ::=
 	implementation
-	[ constant_declaration_part ]
-	[ type_declaration_part ]
-	[ variable_declaration_part ]
-	[ procedure_and_function_declaration_part ]	
+	{ ( constant_declaration_part 
+	| type_declaration_part
+	| variable_declaration_part 
+#ifdef CLASCAL
+	| subroutine_part
+#else
+	| procedure_and_function_declaration_part
+#endif
+	) }
 
 non_regular_unit ::=
 	// Coco seems to have an issue with this in that the generated procedure
@@ -60,11 +71,12 @@ non_regular_unit ::=
 	[ statement_part '.' | end '.' ]
 	
 block ::=
-    [ label_declaration_part ]
-    [ constant_declaration_part ]
-    [ type_declaration_part ]
-    [ variable_declaration_part ]
-    [ procedure_and_function_declaration_part ] 
+    { ( label_declaration_part 
+    | constant_declaration_part
+    | type_declaration_part 
+    | variable_declaration_part
+    | procedure_and_function_declaration_part ) } 
+    // statement_part removed to make it optional if need be
 label_declaration_part ::=
     label label_ { ',' label_ } ';' 
 label_ ::=
@@ -72,9 +84,11 @@ label_ ::=
 constant_declaration_part ::=
     const constant_declaration  { constant_declaration } 
 constant_declaration ::=
-    identifier '=' constant ';'
+    identifier '=' // constant [';'] // apparently optional, seen e.g. in libte/lcut:46
+	    expression [';'] // apparently this can be a full expression, as e.g. seen in libtk/uabc
 constant ::=
-     [ sign ] (  constant_identifier | unsigned_number ) | string_literal
+     [ sign ] (  identifier [ actual_parameter_list ] // constant_identifier or built-in function (apparently supported as well)
+     | unsigned_number ) | string_literal
 type_declaration_part ::=
     type type_declaration { type_declaration } 
 type_declaration ::=
@@ -87,6 +101,17 @@ procedure_and_function_interface_part ::=
     { procedure_heading ';' | function_heading ';' } 
 procedure_and_function_declaration_part ::=
     { procedure_declaration | function_declaration } 
+#ifdef CLASCAL
+subroutine_part ::=
+    { procedure_declaration | function_declaration | method_block }
+method_block ::=
+    methods of identifier [';'] // class_identifier
+		    // semi can apparently be left out as seen e.g. in libut/uunivtext
+    [ procedure_and_function_declaration_part ]
+    // this is the specified syntax, but apparently nowhere used [ [creation] begin block statement_part ] // creation_block
+    // creation can apparently be left out, as seen in libqp/uqpgraph
+    ( statement_part | end ) [';'] // this is the actual syntax used in the code
+#endif
 procedure_declaration ::=
     procedure_heading ';' body_ ';'
 body_ ::= // procedure_body, function_body
@@ -99,14 +124,16 @@ statement_part ::=
 // Procedure and Function Definitions
 
 procedure_heading ::=
-    procedure identifier [ formal_parameter_list ] 
+    procedure identifier [ '.' identifier ] [ formal_parameter_list ] 
+    // apparently in method_interface proc and func names can be Class.Name
 function_heading ::=
-    function identifier [ formal_parameter_list ] 
+    function identifier [ '.' identifier ] [ formal_parameter_list ] 
 	    [':' result_type ] // return type can apparently be left out, as done in some files
 result_type ::=
     type_identifier // ordinal/real/pointer_type_ident
 formal_parameter_list ::=
-    '(' formal_parameter_section { ';' formal_parameter_section } ')' 
+    '(' formal_parameter_section { [';']  // semicolon can apparently be optional, seen in libfp-MATHLIB.TEXT
+	    formal_parameter_section } ')' 
 formal_parameter_section ::=
     parameter_declaration |
     procedure_heading |
@@ -127,8 +154,8 @@ assignment_statement- ::=
     (variable_reference | function_identifier) ':=' expression 
 assigOrCall ::=
     variable_reference // covers assig lhs incl. function_identifier 
-     ( ':=' expression   // covers assig rhs
-     |  [ actual_parameter_list ] ) // covers procedure_statement, but only if lhs has no qualifier
+     [ ':=' expression ]   // covers assig rhs
+     // no in variable_ref: |  [ actual_parameter_list ] ) // covers procedure_statement, but only if lhs has no qualifier
 procedure_statement- ::=
     procedure_identifier [ actual_parameter_list ] 
 goto_statement ::=
@@ -155,7 +182,8 @@ if_statement ::=
     if expression then statement [ else statement ] 
 case_statement ::=
     case expression of
-	case_limb { \LA: 1: ';' & 2:(!end&!otherwise)\ ';' [case_limb] }  // apparently stray ';' are allowed in case
+	[case_limb { \LA: 1: ';' & 2:(!end&!otherwise)\ ';' [case_limb] } ] // apparently stray ';' are allowed in case
+	// can apparently be empty, as seen e.g. in libtk/uobject:1531
 	    [ \LL:2\ otherwise_clause ] [ ';' ]
     end
 case_limb ::=
@@ -163,7 +191,8 @@ case_limb ::=
 case_label_list ::=
     constant { ',' constant } 
 otherwise_clause ::=
-    ';' otherwise statement
+    [';'] otherwise statement
+    // semi can apparently be missing, as seen e.g. in libtk/uobject:1531
 with_statement ::=
     with variable_reference { ',' variable_reference } do statement  // references a record 
 actual_parameter_list ::=
@@ -181,7 +210,7 @@ term ::=
     factor { multiplication_operator factor } 
 factor ::=
     '@' variable_reference 
-    | identifier ( actual_parameter_list | { qualifier } ) // function_designator, bound_identifier, constant_identifier
+    | identifier { qualifier | actual_parameter_list } // function_designator, bound_identifier, constant_identifier
     // Lisa combines unsigned_number, string, constant_identifier and nil to unsigned_constant
     | unsigned_number 
     | string_literal
@@ -197,7 +226,7 @@ multiplication_operator ::=
     '*' | '/' | ':' | div | mod | and // ':' is apparently also supported instead of div
     
 variable_reference ::= 
-	variable_identifier { qualifier }
+	variable_identifier { qualifier | actual_parameter_list } // apparently lhs can be function call with deref
 qualifier ::= 
 	index | field_designator | dereferencer
 index ::= 
@@ -234,7 +263,11 @@ enumerated_type ::=
 subrange_type ::=
     constant ( '..' | ':' ) constant  // ':' apparently is supported too, e.g. in SOURCE-VMSTUFF
 structured_type ::=
-    [ packed ] ( array_type | record_type | set_type | file_type ) 
+    [ packed ] ( array_type | record_type | set_type | file_type 
+#ifdef CLASCAL
+	| class_type
+#endif
+    ) 
 array_type ::=
     array '[' index_type { ',' index_type } ']' of type_ 
 index_type ::=
@@ -242,9 +275,21 @@ index_type ::=
 set_type ::=
     set of ordinal_type 
 file_type ::=
-    file of type_ 
+    file [ of type_ ] // of type_ can apparently be left out, see source/nwshell
 pointer_type ::=
     '^' type_identifier 
+    
+#ifdef CLASCAL
+class_type ::=
+	subclass of ( type_identifier | nil ) // class_identifier; nil apparently supported too, seen in libpl/blkiointr
+	[ field_list ]
+	method_interface { method_interface }
+	end
+method_interface ::=
+	 ( procedure_heading | function_heading ) 
+	 [ \LL:2\ ';' identifier ] ';' // 'abstract' | 'classwide' | 'override' | 'default'
+	 // override not in spec but used in code
+#endif
 
 // Records
 
@@ -258,7 +303,7 @@ field_declaration ::=
     identifier_list ':' type_
 variant_part ::=
     case [ \LL:2\ tag_field] type_identifier // ordinal_type_ident
-    of variant { \LA: 1:';' & 2:!end\ ';' variant } 
+    of variant { \LA: 1:';' & 2:!(end|')')\ ';' variant } 
 tag_field ::=
     identifier ':'
 variant ::=
@@ -268,7 +313,7 @@ variant ::=
 
 field_identifier ::=
     identifier 
-constant_identifier ::=
+constant_identifier- ::=
     identifier 
 variable_identifier ::=
     identifier 
@@ -305,7 +350,9 @@ string_literal ::= // ''' string_character { string_character } '''
 Comment ::=
 Directive ::=
 comment- ::= '(*' '*)' '{' '}'
-oostuff- ::= methods subclass creation intrinsic
+#ifndef CLASCAL
+oostuff- ::= methods subclass creation
+#endif
 
 // Pragmas
 %module ::= 'LisaPascal'

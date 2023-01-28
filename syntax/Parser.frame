@@ -164,7 +164,7 @@ void Parser::Get() {
         {
         case Lisa::Tok_Invalid:
         	if( !d_next.d_val.isEmpty() )
-            	SynErr( d_next.d_type, d_next.d_val );
+                error( d_next.d_lineNr, d_next.d_colNr, d_next.d_val, d_next.d_sourcePath );
             // else errors already handeled in lexer
             break;
         case Lisa::Tok_Comment:

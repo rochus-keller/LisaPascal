@@ -61,6 +61,7 @@ protected slots:
     void onFindAgain();
     void onGotoDefinition();
     void onOpen();
+    void onRunReload();
 
 private:
     class Viewer;

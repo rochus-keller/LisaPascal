@@ -34,6 +34,8 @@
 #include <QTreeWidget>
 #include <QInputDialog>
 #include <QFileDialog>
+#include <QTimer>
+#include <QElapsedTimer>
 using namespace Lisa;
 
 static CodeNavigator* s_this = 0;
@@ -77,7 +79,8 @@ static QList<QByteArray> s_builtIns = QList<QByteArray>() << "ABS" << "ARCTAN" <
                                                           << "PWROFTEN" << "LENGTH" << "POS" << "CONCAT"
                                                           << "COPY" << "DELETE" << "INSERT" << "MOVELEFT"
                                                           << "MOVERIGHT" << "SIZEOF" << "SCANEQ" << "SCANNE"
-                                                          << "FILLCHAR";
+                                                          << "FILLCHAR"
+                                                          << "ABSTRACT" << "CLASSWIDE" << "OVERRIDE" << "DEFAULT";
 
 class CodeNavigator::Viewer : public QPlainTextEdit
 {
@@ -167,7 +170,7 @@ public:
             QApplication::restoreOverrideCursor();
             d_link.clear();
             Q_ASSERT( d_goto );
-            setCursorPosition( d_goto->d_loc, d_goto->d_owner->getCodeFile()->d_file->d_realPath, true );
+            setCursorPosition( d_goto->d_loc, d_goto->getCodeFile()->d_file->d_realPath, true );
         }else if( QApplication::keyboardModifiers() == Qt::ControlModifier )
         {
             QTextCursor cur = cursorForPosition(e->pos());
@@ -176,7 +179,7 @@ public:
             if( id && id->d_decl )
             {
                 //pushLocation( Location( cur.blockNumber(), cur.positionInBlock() ) );
-                setCursorPosition( id->d_loc, id->d_decl->d_owner->getCodeFile()->d_file->d_realPath, true );
+                setCursorPosition( id->d_loc, id->d_decl->getCodeFile()->d_file->d_realPath, true );
             }
         }else
             updateExtraSelections();
@@ -350,11 +353,10 @@ void CodeNavigator::open(const QString& sourceTreePath)
     d_cur = Place();
     d_backHisto.clear();
     d_forwardHisto.clear();
-    d_mdl->load(sourceTreePath);
     d_dir = sourceTreePath;
     setWindowTitle( tr("%3 - %1 v%2").arg( qApp->applicationName() ).arg( qApp->applicationVersion() )
                     .arg( QDir(sourceTreePath).dirName() ));
-
+    QTimer::singleShot(500,this,SLOT(onRunReload()));
 }
 
 void CodeNavigator::logMessage(const QString& str)
@@ -465,7 +467,7 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     if( nt->isDeclaration() )
     {
         const Declaration* d = static_cast<const Declaration*>(nt);
-        FileSystem::File* f = d->d_owner->getCodeFile()->d_file;
+        FileSystem::File* f = d->getCodeFile()->d_file;
         d_loc->setText(f->getVirtualPath());
         d_view->setCursorPosition( d->d_loc, f->d_realPath, true );
     }
@@ -548,7 +550,7 @@ void CodeNavigator::onGotoDefinition()
                 d_view->d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
     if( id && id->d_decl )
         d_view->setCursorPosition( id->d_decl->d_loc,
-                                   id->d_decl->d_owner->getCodeFile()->d_file->d_realPath, true );
+                                   id->d_decl->getCodeFile()->d_file->d_realPath, true );
 #if 0
     // TODO
     if( id.second )
@@ -571,6 +573,16 @@ void CodeNavigator::onOpen()
     open(path);
 }
 
+void CodeNavigator::onRunReload()
+{
+    QElapsedTimer t;
+    t.start();
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    d_mdl->load(d_dir);
+    QApplication::restoreOverrideCursor();
+    qDebug() << "parsed" << d_mdl->getSloc() << "SLOC in" << t.elapsed() << "[ms]";
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -578,7 +590,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.1.0");
+    a.setApplicationVersion("0.2.0");
     a.setStyle("Fusion");
 
     QString dirPath;
@@ -601,9 +613,9 @@ int main(int argc, char *argv[])
     }
 
     CodeNavigator w;
+    w.showMaximized();
     if( !dirPath.isEmpty() )
         w.open(dirPath);
-    w.showMaximized();
 
     return a.exec();
 }

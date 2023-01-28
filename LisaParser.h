@@ -49,38 +49,38 @@ private:
 		_T_begin=31,
 		_T_case=32,
 		_T_const=33,
-		_T_creation=34,
-		_T_div=35,
-		_T_do=36,
-		_T_downto=37,
-		_T_else=38,
-		_T_end=39,
-		_T_external=40,
-		_T_file=41,
-		_T_for=42,
-		_T_forward=43,
-		_T_function=44,
-		_T_goto=45,
-		_T_if=46,
-		_T_implementation=47,
-		_T_in=48,
-		_T_inline=49,
-		_T_interface=50,
-		_T_intrinsic=51,
-		_T_label=52,
-		_T_methods=53,
-		_T_mod=54,
-		_T_nil=55,
-		_T_not=56,
-		_T_of=57,
-		_T_or=58,
-		_T_otherwise=59,
-		_T_packed=60,
-		_T_procedure=61,
-		_T_program=62,
-		_T_record=63,
-		_T_repeat=64,
-		_T_set=65,
+		_T_div=34,
+		_T_do=35,
+		_T_downto=36,
+		_T_else=37,
+		_T_end=38,
+		_T_external=39,
+		_T_file=40,
+		_T_for=41,
+		_T_forward=42,
+		_T_function=43,
+		_T_goto=44,
+		_T_if=45,
+		_T_implementation=46,
+		_T_in=47,
+		_T_inline=48,
+		_T_interface=49,
+		_T_intrinsic=50,
+		_T_label=51,
+		_T_methods=52,
+		_T_mod=53,
+		_T_nil=54,
+		_T_not=55,
+		_T_of=56,
+		_T_or=57,
+		_T_otherwise=58,
+		_T_packed=59,
+		_T_procedure=60,
+		_T_program=61,
+		_T_record=62,
+		_T_repeat=63,
+		_T_set=64,
+		_T_shared=65,
 		_T_string=66,
 		_T_subclass=67,
 		_T_then=68,
@@ -175,6 +175,7 @@ Lisa::SynTree d_root;
 	void statement_part();
 	void program_parameters();
 	void identifier_list();
+	void identifier_list2();
 	void unit_heading();
 	void interface_part();
 	void implementation_part();
@@ -182,13 +183,15 @@ Lisa::SynTree d_root;
 	void type_declaration_part();
 	void variable_declaration_part();
 	void procedure_and_function_interface_part();
+	void subroutine_part();
 	void procedure_and_function_declaration_part();
 	void label_declaration_part();
 	void label_();
 	void constant_declaration();
+	void expression();
 	void constant();
 	void sign();
-	void constant_identifier();
+	void actual_parameter_list();
 	void unsigned_number();
 	void type_declaration();
 	void type_();
@@ -197,6 +200,7 @@ Lisa::SynTree d_root;
 	void function_heading();
 	void procedure_declaration();
 	void function_declaration();
+	void method_block();
 	void body_();
 	void compound_statement();
 	void formal_parameter_list();
@@ -211,8 +215,6 @@ Lisa::SynTree d_root;
 	void assigOrCall();
 	void goto_statement();
 	void variable_reference();
-	void expression();
-	void actual_parameter_list();
 	void repetitive_statement();
 	void conditional_statement();
 	void with_statement();
@@ -255,8 +257,10 @@ Lisa::SynTree d_root;
 	void record_type();
 	void set_type();
 	void file_type();
+	void class_type();
 	void index_type();
 	void field_list();
+	void method_interface();
 	void fixed_part();
 	void variant_part();
 	void field_declaration();

@@ -152,7 +152,7 @@ const FileSystem::File*FileSystem::findFile(const Dir* startFrom, const QString&
     const Dir* d = startFrom;
     if( res == 0 && d )
     {
-        if( d->d_name == dir )
+        if( dir.isEmpty() || d->d_name == dir )
             res = d->file(name);
         d = d->d_dir;
     }
@@ -183,7 +183,9 @@ FileSystem::FileType FileSystem::detectType(QIODevice* in)
         case Tok_function:
         case Tok_procedure:
         case Tok_const:
+#ifdef LISA_CLASCAL
         case Tok_methods:
+#endif
             // exceptions: aplw-compflags
             return PascalFragment;
         default:

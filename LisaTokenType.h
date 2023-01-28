@@ -5,6 +5,8 @@
 
 #include <QByteArray>
 
+#define LISA_CLASCAL
+
 namespace Lisa {
 	enum TokenType {
 		Tok_Invalid = 0,
@@ -43,7 +45,6 @@ namespace Lisa {
 		Tok_begin,
 		Tok_case,
 		Tok_const,
-		Tok_creation,
 		Tok_div,
 		Tok_do,
 		Tok_downto,
@@ -75,6 +76,7 @@ namespace Lisa {
 		Tok_record,
 		Tok_repeat,
 		Tok_set,
+		Tok_shared,
 		Tok_string,
 		Tok_subclass,
 		Tok_then,

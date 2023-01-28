@@ -66,6 +66,7 @@ public:
     Scope* d_owner;
     QHash<CodeFile*,QList<Symbol*> > d_refs;
 
+    CodeFile* getCodeFile() const;
     Declaration():d_impl(0),d_intf(0),d_body(0),d_owner(0){}
     ~Declaration();
 };
@@ -125,6 +126,8 @@ public:
     bool load( const QString& rootDir );
     const Thing* getThing(const QModelIndex& index) const;
     Symbol* findSymbolBySourcePos(const QString& path, int line, int col) const;
+    FileSystem* getFs() const { return d_fs; }
+    quint32 getSloc() const { return d_sloc; }
 
     // overrides
     int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
@@ -152,6 +155,7 @@ private:
     FileSystem* d_fs;
     CodeFolder d_top;
     QHash<QString,CodeFile*> d_map; // real path -> file
+    quint32 d_sloc; // number of lines of code without empty or comment lines
 };
 }
 

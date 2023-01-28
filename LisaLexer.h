@@ -38,6 +38,7 @@ public:
     Token nextToken();
     Token peekToken(quint8 lookAhead = 1);
     QList<Token> tokens( const QString& code );
+    quint32 getSloc() const { return d_sloc; }
 protected:
     Token nextTokenImp();
     int skipWhiteSpace();
@@ -49,6 +50,7 @@ protected:
     Token hexnumber();
     Token comment(bool brace = false);
     Token string();
+    void countLine();
 private:
     QIODevice* d_in;
     quint32 d_lineNr;
@@ -56,9 +58,11 @@ private:
     QByteArray d_line;
     QList<Token> d_buffer;
     Token d_lastToken;
+    quint32 d_sloc; // number of lines of code without empty or comment lines
     QString d_filePath;
     bool d_ignoreComments;  // don't deliver comment tokens
     bool d_packComments;    // Only deliver one Tok_Comment for /**/ instead of Tok_Lcmt and Tok_Rcmt
+    bool d_lineCounted;
 };
 
 }

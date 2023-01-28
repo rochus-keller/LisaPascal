@@ -70,7 +70,9 @@ int Converter::detectPascal( QIODevice* in )
         case Tok_function:
         case Tok_procedure:
         case Tok_const:
+#ifdef LISA_CLASCAL
         case Tok_methods:
+#endif
             // exceptions: aplw-compflags
             return PartialUnit;
         default:
