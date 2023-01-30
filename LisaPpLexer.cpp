@@ -14,7 +14,7 @@
 ** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 */
 
-#include "PpLexer.h"
+#include "LisaPpLexer.h"
 #include <QBuffer>
 #include <QFile>
 #include <QtDebug>
@@ -240,9 +240,9 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
     }else
     {
         Include inc;
-        inc.d_file = found;
-        inc.d_loc.d_row = t.d_lineNr;
-        inc.d_loc.d_col = t.d_colNr;
+        inc.d_inc = found;
+        inc.d_loc = t.toLoc();
+        inc.d_sourcePath = t.d_sourcePath;
         inc.d_len = t.d_val.size();
         d_includes.append(inc);
         d_stack.push_back(Lexer());

@@ -22,10 +22,10 @@ HEADERS += \
     LisaHighlighter.h \
     LisaCodeNavigator.h \
     LisaCodeModel.h \
-    FileSystem.h \
-    PpLexer.h \
     LisaParser.h \
-    LisaRowCol.h
+    LisaRowCol.h \
+    LisaFileSystem.h \
+    LisaPpLexer.h
 
 SOURCES += \
     LisaLexer.cpp \
@@ -34,10 +34,10 @@ SOURCES += \
     LisaHighlighter.cpp \
     LisaCodeNavigator.cpp \
     LisaCodeModel.cpp \
-    FileSystem.cpp \
-    PpLexer.cpp \
     LisaParser.cpp \
-    LisaToken.cpp
+    LisaToken.cpp \
+    LisaFileSystem.cpp \
+    LisaPpLexer.cpp
 
 RESOURCES += \
     CodeNavigator.qrc

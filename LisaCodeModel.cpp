@@ -18,7 +18,7 @@
 */
 
 #include "LisaCodeModel.h"
-#include "PpLexer.h"
+#include "LisaPpLexer.h"
 #include "LisaParser.h"
 #include <QFile>
 #include <QPixmap>
@@ -29,11 +29,11 @@ using namespace Lisa;
 class CodeModelVisitor
 {
     CodeModel* d_mdl;
-    CodeFile* d_cf;
+    UnitFile* d_cf;
 public:
     CodeModelVisitor(CodeModel* m):d_mdl(m) {}
 
-    void visit( CodeFile* cf, SynTree* top )
+    void visit( UnitFile* cf, SynTree* top )
     {      
         d_cf = cf;
         if( top->d_children.isEmpty() )
@@ -51,7 +51,7 @@ public:
             break;
         }
     }
-    void program( CodeFile* cf, SynTree* st )
+    void program( UnitFile* cf, SynTree* st )
     {
         Scope* s = new Scope();
         s->d_owner = cf;
@@ -70,7 +70,7 @@ public:
             }
         }
     }
-    void regular_unit( CodeFile* cf, SynTree* st )
+    void regular_unit( UnitFile* cf, SynTree* st )
     {
         foreach( SynTree* s, st->d_children )
         {
@@ -80,7 +80,7 @@ public:
                 implementation_part(cf,s);
         }
     }
-    void interface_part( CodeFile* cf, SynTree* st )
+    void interface_part( UnitFile* cf, SynTree* st )
     {
         Scope* newScope = new Scope();
         newScope->d_owner = cf;
@@ -94,7 +94,7 @@ public:
                 type_declaration_part(newScope,s);
             if( s->d_tok.d_type == SynTree::R_variable_declaration_part)
                 variable_declaration_part(newScope,s);
-            if( s->d_tok.d_type == SynTree::R_procedure_and_function_declaration_part)
+            if( s->d_tok.d_type == SynTree::R_procedure_and_function_interface_part)
                 procedure_and_function_interface_part(newScope,s);
         }
     }
@@ -108,7 +108,7 @@ public:
                 function_heading(scope,s);
         }
     }
-    void implementation_part( CodeFile* cf, SynTree* st )
+    void implementation_part( UnitFile* cf, SynTree* st )
     {
         Scope* newScope = new Scope();
         newScope->d_owner = cf;
@@ -198,14 +198,61 @@ public:
             if( s->d_tok.d_type == SynTree::R_type_declaration)
                 type_declaration(scope,s);
     }
+    Declaration* findInterface(Scope* scope, const Token&t)
+    {
+        if( d_cf->d_intf && scope == d_cf->d_impl )
+        {
+            Declaration* res = 0;
+            foreach( Declaration* d, d_cf->d_intf->d_order )
+            {
+                if( d->d_name == t.d_val )
+                {
+                    res = d;
+                    break;
+                }
+            }
+            return res;
+        }
+        return 0;
+    }
+
     Declaration* addDecl(Scope* scope, const Token& t, int type )
     {
         Declaration* d = new Declaration();
         d->d_type = type;
         d->d_name = t.d_val;
-        d->d_loc = t.toLoc();
+        d->d_loc.d_pos = t.toLoc();
+        d->d_loc.d_filePath = t.d_sourcePath;
         d->d_owner = scope;
         scope->d_order.append(d);
+
+        // each decl is also a symbol
+        if( Declaration* intf = findInterface(scope,t) )
+        {
+            // add the present symbol which points to the interface twin
+            Symbol* sy = new Symbol();
+            sy->d_decl = intf;
+            sy->d_loc = t.toLoc();
+            d_cf->d_syms[t.d_sourcePath].append(sy);
+            intf->d_refs[t.d_sourcePath].append(sy);
+            d->d_me = sy;
+
+            // add a symbol for the interface twin pointing to the present declaration
+            sy = new Symbol();
+            sy->d_decl = d;
+            sy->d_loc = intf->d_loc.d_pos;
+            d_cf->d_syms[intf->d_loc.d_filePath].append(sy);
+            d->d_refs[intf->d_loc.d_filePath].append(sy);
+        }else
+        {
+            Symbol* sy = new Symbol();
+            sy->d_decl = d;
+            sy->d_loc = t.toLoc();
+            d_cf->d_syms[t.d_sourcePath].append(sy);
+            d->d_refs[t.d_sourcePath].append(sy);
+            d->d_me = sy;
+        }
+
         return d;
     }
 
@@ -413,12 +460,8 @@ public:
             Symbol* sy = new Symbol();
             sy->d_decl = d;
             sy->d_loc = t.toLoc();
-            d_cf->d_syms.append(sy);
-            if( sy->d_decl && sy->d_decl->isDeclaration() )
-            {
-                Declaration* d = static_cast<Declaration*>(sy->d_decl);
-                d->d_refs[d_cf].append(sy);
-            }
+            d_cf->d_syms[t.d_sourcePath].append(sy);
+            d->d_refs[t.d_sourcePath].append(sy);
             return sy;
         }else
             return 0;
@@ -746,8 +789,8 @@ bool CodeModel::load(const QString& rootDir)
     fillFolders(&d_root,&d_fs->getRoot(), &d_top, fileSlots);
     foreach( Slot* s, fileSlots )
     {
-        Q_ASSERT( s->d_thing && s->d_thing->d_type == Thing::File);
-        CodeFile* f = static_cast<CodeFile*>(s->d_thing);
+        Q_ASSERT( s->d_thing && s->d_thing->d_type == Thing::Unit);
+        UnitFile* f = static_cast<UnitFile*>(s->d_thing);
         Q_ASSERT( f->d_file );
         parseAndResolve(f);
         for( int i = 0; i < f->d_includes.size(); i++ )
@@ -766,12 +809,19 @@ const Thing* CodeModel::getThing(const QModelIndex& index) const
     return s->d_thing;
 }
 
+QModelIndex CodeModel::findThing(const Thing* nt) const
+{
+    return findThing( &d_root, nt );
+}
+
 Symbol*CodeModel::findSymbolBySourcePos(const QString& path, int line, int col) const
 {
-    CodeFile* cf = d_map2.value(path);
-    if( cf == 0 )
+    UnitFile* uf = getUnitFile(path);
+    if( uf == 0 )
         return 0;
-    foreach( Symbol* s, cf->d_syms )
+
+    const UnitFile::SymList& syms = uf->d_syms.value(path);
+    foreach( Symbol* s, syms )
     {
         if( s->d_decl && s->d_loc.d_row == line &&
                 s->d_loc.d_col <= col && col < s->d_loc.d_col + s->d_decl->getLen() )
@@ -786,6 +836,24 @@ CodeFile*CodeModel::getCodeFile(const QString& path) const
     return d_map2.value(path);
 }
 
+UnitFile*CodeModel::getUnitFile(const QString& path) const
+{
+    CodeFile* cf = d_map2.value(path);;
+    if( cf )
+    {
+        UnitFile* uf = cf->toUnit();
+        if( uf == 0 )
+        {
+            IncludeFile* inc = cf->toInclude();
+            Q_ASSERT(inc);
+            uf = inc->d_unit;
+        }
+        Q_ASSERT(uf);
+        return uf;
+    }
+    return 0;
+}
+
 QVariant CodeModel::data(const QModelIndex& index, int role) const
 {
     Slot* s = static_cast<Slot*>( index.internalPointer() );
@@ -795,8 +863,8 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
     case Qt::DisplayRole:
         switch( s->d_thing->d_type )
         {
-        case Thing::File:
-            return static_cast<CodeFile*>(s->d_thing)->d_file->d_name;
+        case Thing::Unit:
+            return static_cast<UnitFile*>(s->d_thing)->d_file->d_name;
         case Thing::Include:
             return static_cast<IncludeFile*>(s->d_thing)->d_file->d_name;
         case Thing::Folder:
@@ -806,7 +874,7 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
     case Qt::DecorationRole:
         switch( s->d_thing->d_type )
         {
-        case Thing::File:
+        case Thing::Unit:
             return QPixmap(":/images/unit.png");
         case Thing::Include:
             return QPixmap(":/images/include.png");
@@ -817,9 +885,9 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
     case Qt::ToolTipRole:
         switch( s->d_thing->d_type )
         {
-        case Thing::File:
+        case Thing::Unit:
             {
-                CodeFile* cf = static_cast<CodeFile*>(s->d_thing);
+                UnitFile* cf = static_cast<UnitFile*>(s->d_thing);
                 return QString("<html><b>%1 %2</b><br>"
                                "<p>Logical path: %3</p>"
                                "<p>Real path: %4</p></html>")
@@ -887,32 +955,32 @@ Qt::ItemFlags CodeModel::flags(const QModelIndex& index) const
     return Qt::ItemIsEnabled | Qt::ItemIsSelectable; //  | Qt::ItemIsDragEnabled;
 }
 
-void CodeModel::parseAndResolve(CodeFile* file)
+void CodeModel::parseAndResolve(UnitFile* unit)
 {
-    if( file->d_file->d_parsed )
+    if( unit->d_file->d_parsed )
         return; // already done
 
-    QByteArrayList usedNames = file->findUses();
+    QByteArrayList usedNames = unit->findUses();
     for( int i = 0; i < usedNames.size(); i++ )
     {
-        const FileSystem::File* u = d_fs->findModule(file->d_file->d_dir,usedNames[i].toLower());
+        const FileSystem::File* u = d_fs->findModule(unit->d_file->d_dir,usedNames[i].toLower());
         if( u == 0 )
         {
             const QString line = tr("%1: cannot resolve referenced unit '%2'")
-                    .arg( file->d_file->getVirtualPath(false) ).arg(usedNames[i].constData());
+                    .arg( unit->d_file->getVirtualPath(false) ).arg(usedNames[i].constData());
             qCritical() << line.toUtf8().constData();
         }else
         {
-            CodeFile* tmp = d_map1.value(u);
-            Q_ASSERT( tmp );
-            file->d_import.append( tmp );
-            parseAndResolve(tmp);
+            UnitFile* uf = d_map1.value(u);
+            Q_ASSERT( uf );
+            unit->d_import.append( uf );
+            parseAndResolve(uf);
         }
     }
 
-    const_cast<FileSystem::File*>(file->d_file)->d_parsed = true;
+    const_cast<FileSystem::File*>(unit->d_file)->d_parsed = true;
     PpLexer lex(d_fs);
-    lex.reset(file->d_file->d_realPath);
+    lex.reset(unit->d_file->d_realPath);
     Parser p(&lex);
     p.RunParser();
     const int off = d_fs->getRootPath().size();
@@ -930,18 +998,36 @@ void CodeModel::parseAndResolve(CodeFile* file)
     foreach( const PpLexer::Include& f, lex.getIncludes() )
     {
         IncludeFile* inc = new IncludeFile();
-        inc->d_file = f.d_file;
-        inc->d_loc = f.d_loc;
+        inc->d_file = f.d_inc;
         inc->d_len = f.d_len;
-        inc->d_includer = file;
-        file->d_includes.append(inc);
+        inc->d_unit = unit;
+        Symbol* sym = new Symbol();
+        sym->d_decl = inc;
+        sym->d_loc = f.d_loc;
+        unit->d_syms[f.d_sourcePath].append(sym);
+        d_map2[f.d_inc->d_realPath] = inc;
+        unit->d_includes.append(inc);
     }
     d_sloc += lex.getSloc();
 
     CodeModelVisitor v(this);
-    v.visit(file,&p.d_root);
+    v.visit(unit,&p.d_root);
 
     QCoreApplication::processEvents();
+}
+
+QModelIndex CodeModel::findThing(const CodeModel::Slot* slot, const Thing* nt) const
+{
+    for( int i = 0; i < slot->d_children.size(); i++ )
+    {
+        Slot* s = slot->d_children[i];
+        if( s->d_thing == nt )
+            return createIndex( i, 0, s );
+        QModelIndex index = findThing( s, nt );
+        if( index.isValid() )
+            return index;
+    }
+    return QModelIndex();
 }
 
 bool CodeModel::lessThan(const CodeModel::Slot* lhs, const CodeModel::Slot* rhs)
@@ -966,7 +1052,7 @@ void CodeModel::fillFolders(CodeModel::Slot* root, const FileSystem::Dir* super,
         if( super->d_files[i]->d_type == FileSystem::PascalProgram ||
                 super->d_files[i]->d_type == FileSystem::PascalUnit )
         {
-            CodeFile* f = new CodeFile();
+            UnitFile* f = new UnitFile();
             f->d_file = super->d_files[i];
             d_map1[f->d_file] = f;
             d_map2[f->d_file->d_realPath] = f;
@@ -979,12 +1065,12 @@ void CodeModel::fillFolders(CodeModel::Slot* root, const FileSystem::Dir* super,
 
 }
 
-QString CodeFile::getName() const
+QString UnitFile::getName() const
 {
     return d_file->d_name;
 }
 
-QByteArrayList CodeFile::findUses() const
+QByteArrayList UnitFile::findUses() const
 {
     QByteArrayList res;
     if( d_file == 0 || !(d_file->d_type == FileSystem::PascalProgram ||
@@ -1040,28 +1126,30 @@ QByteArrayList CodeFile::findUses() const
     return res;
 }
 
-CodeFile::~CodeFile()
+UnitFile::~UnitFile()
 {
     if( d_impl )
         delete d_impl;
     if( d_intf )
         delete d_intf;
-    for( int i = 0; i < d_syms.size(); i++ )
-        delete d_syms[i];
+    QHash<QString,SymList>::const_iterator j;
+    for( j = d_syms.begin(); j != d_syms.end(); ++j )
+        for( int i = 0; i < j.value().size(); i++ )
+            delete j.value()[i];
     for( int i = 0; i < d_includes.size(); i++ )
         delete d_includes[i];
 }
 
-CodeFile*Scope::getCodeFile() const
+UnitFile*Scope::getUnitFile() const
 {
     Q_ASSERT( d_owner != 0 );
-    if( d_owner->d_type == Thing::File )
-        return static_cast<CodeFile*>(d_owner);
+    if( d_owner->d_type == Thing::Unit )
+        return static_cast<UnitFile*>(d_owner);
     else if( d_owner->isDeclaration() )
     {
         Declaration* d = static_cast<Declaration*>(d_owner);
         Q_ASSERT( d->d_owner != 0 );
-        return d->d_owner->getCodeFile();
+        return d->d_owner->getUnitFile();
     }else
         Q_ASSERT(false);
 }
@@ -1085,13 +1173,13 @@ Declaration*Scope::findDecl(const QByteArray& name, bool withImports) const
     if( d_outer )
         return d_outer->findDecl(name);
 
-    return 0; // TODO: the following is still too slow (takes ~ 30% longer)
+    // return 0; // TODO: the following is still too slow (takes ~ 30% longer)
     if( withImports )
     {
-        CodeFile* cf = getCodeFile();
+        UnitFile* cf = getUnitFile();
         if( cf == 0 )
             return 0; // TODO: this happens, check
-        foreach( CodeFile* imp, cf->d_import )
+        foreach( UnitFile* imp, cf->d_import )
         {
             if( imp->d_intf )
             {
@@ -1113,22 +1201,15 @@ Scope::~Scope()
         delete d_order[i];
 }
 
-QString Declaration::getFilePath() const
-{
-    CodeFile* file = getCodeFile();
-    Q_ASSERT(file && file->d_file);
-    return file->d_file->d_realPath;
-}
-
 QString Declaration::getName() const
 {
     return d_name;
 }
 
-CodeFile*Declaration::getCodeFile() const
+UnitFile*Declaration::getUnitFile() const
 {
     Q_ASSERT( d_owner != 0 );
-    return d_owner->getCodeFile();
+    return d_owner->getUnitFile();
 }
 
 Declaration::~Declaration()
@@ -1152,9 +1233,9 @@ void CodeFolder::clear()
     d_files.clear();
 }
 
-QString IncludeFile::getFilePath() const
+FilePos IncludeFile::getLoc() const
 {
-    return d_file->d_realPath;
+    return FilePos( RowCol(1,1), d_file->d_realPath );
 }
 
 QString IncludeFile::getName() const
@@ -1189,4 +1270,24 @@ const char*Thing::typeName() const
 Thing::~Thing()
 {
 
+}
+
+UnitFile*CodeFile::toUnit()
+{
+    if( d_type == Unit )
+        return static_cast<UnitFile*>(this);
+    else
+        return 0;
+}
+
+IncludeFile*CodeFile::toInclude()
+{
+    if( d_type == Include )
+        return static_cast<IncludeFile*>(this);
+    else
+        return 0;
+}
+
+CodeFile::~CodeFile()
+{
 }

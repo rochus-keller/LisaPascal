@@ -18,7 +18,7 @@
 
 */
 
-#include <qglobal.h>
+#include <QString>
 
 namespace Lisa
 {
@@ -28,6 +28,16 @@ struct RowCol
     quint32 d_row : ROW_BIT_LEN;
     quint32 d_col : COL_BIT_LEN;
     RowCol(int row = 0, int col = 0):d_row(row),d_col(col){}
+    quint32 packed() const { return ( d_row << COL_BIT_LEN ) | d_col; }
+    bool operator==(const RowCol& rhs) const {
+        return d_row == rhs.d_row && d_col == rhs.d_col;
+    }
+};
+struct FilePos
+{
+    RowCol d_pos;
+    QString d_filePath;
+    FilePos(RowCol pos = RowCol(), const QString& path = QString()):d_pos(pos),d_filePath(path){}
 };
 }
 

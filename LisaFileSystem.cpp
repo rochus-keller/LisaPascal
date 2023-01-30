@@ -14,7 +14,7 @@
 ** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 */
 
-#include "FileSystem.h"
+#include "LisaFileSystem.h"
 #include "Converter.h"
 #include "LisaLexer.h"
 #include <QFile>

@@ -22,13 +22,13 @@
 
 #include <QAbstractItemModel>
 #include <QHash>
-#include <FileSystem.h>
+#include <LisaFileSystem.h>
 #include "LisaRowCol.h"
 
 namespace Lisa
 {
 class Scope;
-class CodeFile;
+class UnitFile;
 class Symbol;
 
 class Thing
@@ -37,17 +37,17 @@ public:
     enum Type { Undefined,
        /* Declaration: */ Const, Type, Var, Func, Proc, Param, Label, Field, TypeAlias,
        /* Scope: */ Interface, Implementation, Body,
-       /* CodeFile: */ File,
+       /* UnitFile: */ Unit,
        /* IncludeFile: */ Include,
        /* CodeFolder: */ Folder
     };
     quint8 d_type;
     bool d_external; // Fund & Proc decls
 
-    virtual RowCol getLoc() const { return RowCol(); }
-    virtual QString getFilePath() const { return QString(); }
+    virtual FilePos getLoc() const { return FilePos(); }
     virtual quint16 getLen() const { return 0; }
     virtual QString getName() const;
+    virtual const FileSystem::File* getFile() const { return 0; }
     bool isDeclaration() const { return d_type >= Const && d_type <= TypeAlias; }
     const char* typeName() const;
     Thing():d_type(Undefined),d_external(false){}
@@ -57,20 +57,23 @@ public:
 class Declaration : public Thing
 {
 public:
-    Declaration* d_impl; // points to the twin in the implementation if this is in an interface
-    Declaration* d_intf; // points to the twin in the interface if this is in an implementation
     Scope* d_body; // owns
     QByteArray d_name;
-    RowCol d_loc;
-    Scope* d_owner;
-    QHash<CodeFile*,QList<Symbol*> > d_refs;
 
-    RowCol getLoc() const { return d_loc; }
-    QString getFilePath() const;
+    FilePos d_loc; // place in unit or any include file where the decl is actually located
+    Scope* d_owner;
+
+    typedef QList<Symbol*> SymList;
+    typedef QHash<QString,SymList> Refs;
+    Refs d_refs; // file path -> Symbols in it
+    Symbol* d_me;
+
+    FilePos getLoc() const { return d_loc; }
     quint16 getLen() const { return d_name.size(); }
     QString getName() const;
-    CodeFile* getCodeFile() const;
-    Declaration():d_impl(0),d_intf(0),d_body(0),d_owner(0){}
+
+    UnitFile* getUnitFile() const; // only for ownership, not for actual file position
+    Declaration():d_body(0),d_owner(0),d_me(0){}
     ~Declaration();
 };
 
@@ -78,11 +81,11 @@ class Scope : public Thing
 {
 public:
     QList<Declaration*> d_order; // owns
-    Thing* d_owner; // either declaration or codefile
+    Thing* d_owner; // either declaration or unit file
     Scope* d_outer;
     mutable QHash<QByteArray,Declaration*> d_cache;
 
-    CodeFile* getCodeFile() const;
+    UnitFile* getUnitFile() const;
     Declaration* findDecl(const QByteArray& name , bool withImports = true) const;
     Scope():d_owner(0),d_outer(0){}
     ~Scope();
@@ -92,39 +95,52 @@ class Symbol
 {
 public:
     Thing* d_decl;
-    RowCol d_loc;
+    RowCol d_loc; // the position of the symbol in the file (declaration has other position, but same length)
     Symbol():d_decl(0){}
 };
 
-class IncludeFile : public Thing
-{
-public:
-    const FileSystem::File* d_file;
-    CodeFile* d_includer;
-    RowCol d_loc;
-    quint16 d_len;
-
-    RowCol getLoc() const { return d_loc; }
-    QString getFilePath() const;
-    quint16 getLen() const { return d_len; }
-    QString getName() const;
-    IncludeFile():d_file(0),d_includer(0),d_len(0){ d_type = Include; }
-};
+class IncludeFile;
+class UnitFile;
 
 class CodeFile : public Thing
 {
 public:
+    const FileSystem::File* d_file;
+
+    UnitFile* toUnit();
+    IncludeFile* toInclude();
+
+    const FileSystem::File* getFile() const { return d_file; }
+    CodeFile():d_file(0) {}
+    ~CodeFile();
+};
+
+class IncludeFile : public CodeFile
+{
+public:
+    UnitFile* d_unit;
+    quint16 d_len; // just to make the symbol of the include directive happy
+
+    FilePos getLoc() const; // the landing place when we jump to this file
+    quint16 getLen() const { return d_len; }
+    QString getName() const;
+    IncludeFile():d_unit(0),d_len(0){ d_type = Include; }
+};
+
+class UnitFile : public CodeFile
+{
+public:
     Scope* d_intf; // owns, 0 for Program
     Scope* d_impl; // owns
-    QList<Symbol*> d_syms; // owns, all things we can click on in a code file ordered by row/col
-    const FileSystem::File* d_file;
+    QList<UnitFile*> d_import;
+    typedef QList<Symbol*> SymList;
+    QHash<QString,SymList> d_syms; // owns, all things we can click on in a code file ordered by row/col
     QList<IncludeFile*> d_includes; // owns
-    QList<CodeFile*> d_import;
 
     QString getName() const;
     QByteArrayList findUses() const;
-    CodeFile():d_intf(0),d_impl(0),d_file(0) { d_type = File; }
-    ~CodeFile();
+    UnitFile():d_intf(0),d_impl(0) { d_type = Unit; }
+    ~UnitFile();
 };
 
 class CodeFolder : public Thing
@@ -132,7 +148,7 @@ class CodeFolder : public Thing
 public:
     FileSystem::Dir* d_dir;
     QList<CodeFolder*> d_subs; // owns
-    QList<CodeFile*> d_files; // owns
+    QList<UnitFile*> d_files; // owns
 
     QString getName() const;
     void clear();
@@ -148,10 +164,12 @@ public:
 
     bool load( const QString& rootDir );
     const Thing* getThing(const QModelIndex& index) const;
+    QModelIndex findThing(const Thing* nt) const;
     Symbol* findSymbolBySourcePos(const QString& path, int line, int col) const;
     FileSystem* getFs() const { return d_fs; }
     quint32 getSloc() const { return d_sloc; }
     CodeFile* getCodeFile(const QString& path) const;
+    UnitFile* getUnitFile(const QString& path) const;
 
     // overrides
     int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
@@ -162,7 +180,7 @@ public:
     Qt::ItemFlags flags ( const QModelIndex & index ) const;
 
 protected:
-    void parseAndResolve(CodeFile*);
+    void parseAndResolve(UnitFile*);
 
 private:
     struct Slot
@@ -175,10 +193,11 @@ private:
     };
     static bool lessThan( const Slot* lhs, const Slot* rhs);
     void fillFolders(Slot* root, const FileSystem::Dir* super, CodeFolder* top, QList<Slot*>& fileSlots);
+    QModelIndex findThing(const Slot* slot,const Thing* nt) const;
     Slot d_root;
     FileSystem* d_fs;
     CodeFolder d_top;
-    QHash<const FileSystem::File*,CodeFile*> d_map1;
+    QHash<const FileSystem::File*,UnitFile*> d_map1;
     QHash<QString,CodeFile*> d_map2; // real path -> file
     quint32 d_sloc; // number of lines of code without empty or comment lines
 };

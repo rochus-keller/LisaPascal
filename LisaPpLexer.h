@@ -17,7 +17,7 @@
 ** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 */
 
-#include "FileSystem.h"
+#include "LisaFileSystem.h"
 #include "LisaLexer.h"
 #include "LisaRowCol.h"
 
@@ -34,9 +34,10 @@ public:
     typedef QHash<QByteArray,int> PpVars;
     struct Include
     {
-        const FileSystem::File* d_file;
-        RowCol d_loc;
-        quint16 d_len;
+        const FileSystem::File* d_inc; // the file to include
+        QString d_sourcePath; // the file where the include lives
+        RowCol d_loc; // the pos of the include directive in sourcePath
+        quint16 d_len; // the len of the include directive
     };
 
 

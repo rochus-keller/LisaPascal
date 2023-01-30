@@ -22,6 +22,7 @@
 
 #include <QMainWindow>
 #include "LisaRowCol.h"
+#include "LisaFileSystem.h"
 
 class QLabel;
 class QPlainTextEdit;
@@ -46,13 +47,11 @@ public:
 protected:
     struct Place
     {
-        // Qt-Koordinaten
-        RowCol d_loc;
+        FilePos d_loc;
         quint16 d_yoff;
-        QString d_path;
-        bool operator==( const Place& rhs ) { return d_loc.d_row == rhs.d_loc.d_row &&
-                    d_loc.d_col == rhs.d_loc.d_col && d_path == rhs.d_path; }
-        Place(const QString& f, RowCol loc, quint16 y ):d_path(f),d_loc(loc),d_yoff(y){}
+        bool operator==( const Place& rhs ) { return d_loc.d_pos.d_row == rhs.d_loc.d_pos.d_row &&
+                    d_loc.d_pos.d_col == rhs.d_loc.d_pos.d_col && d_loc.d_filePath == rhs.d_loc.d_filePath; }
+        Place(const FilePos& loc, quint16 y ):d_loc(loc),d_yoff(y){}
         Place():d_yoff(0) {}
     };
 
@@ -61,7 +60,10 @@ protected:
     void createLog();
     void pushLocation( const Place& );
     void showViewer( const Place& );
-    void fillUsedBy(Declaration*);
+    void fillUsedBy(Symbol* id, Declaration*);
+    void setPathTitle(const FileSystem::File* f, int row, int col);
+    void syncModuleList(Declaration*);
+    void syncModuleList();
 
     // overrides
     void closeEvent(QCloseEvent* event);
@@ -82,7 +84,7 @@ protected slots:
 private:
     class Viewer;
     Viewer* d_view;
-    QLabel* d_loc;
+    QLabel* d_pathTitle;
     QPlainTextEdit* d_msgLog;
     QTreeView* d_things;
     QLabel* d_usedByTitle;
