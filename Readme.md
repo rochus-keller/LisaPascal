@@ -22,11 +22,11 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] Overlay file system to accomodate original structure and resolve dependencies
 - [x] Highlighted code browser
 - [x] Mark symbols and navigate from symbols do declarations across all files
+- [x] BUSY & LeanQt build
 - [ ] resolve qualifiers by type for navigation of record fields
 - [ ] Module detail outline view
 - [ ] Class hierarchy outline view
 - [ ] precompiled binary versions for all platforms
-- [ ] BUSY & LeanQt build
 - [ ] MC68000 assembler integrated with code model and symbol navigation
 
 #### Features in evaluation
@@ -57,7 +57,10 @@ Symbol lookup is too slow in the current implementation; I will do it as I did i
 
 #### Current Status on January 30, 2023
 
-After a lot of debugging and fixing source code navigation works as expected (besides some symbols not yet indexed), and also the "Used by" cross-reference list is implemented and can be used for navigation (double-click). Also navigation history is improved (ALT+Left, ALT+Right) und synced with the views. Next I will complete the indexer.
+After a lot of debugging and fixing source code navigation works as expected (besides some symbols not yet indexed), and also the "Used by" cross-reference list is implemented and can be used for navigation (double-click). Also navigation history is improved (ALT+Left, ALT+Right) und synced with the views. 
+The indexer now considers the full syntax, including modules and imports, but qualifiers are not yet resolved.
+I also implemented internalized strings with comparisons by address instead of by string, and now indexing takes only ~8% more time than just parsing.
+There is now also a BUSY build file, see below how to use it.
 
 #### Precompiled versions
 
@@ -65,7 +68,18 @@ After a lot of debugging and fixing source code navigation works as expected (be
 
 #### How to build the parser and code navigator
 
-[TBD]
+The executable can be built on all common platforms using regular Qt 5.x or using [LeanQt](https://github.com/rochus-keller/LeanQt) with minimal dependencies.
+
+The project includes the CodeNavigator.pro file which can be opened and built in Qt Creator or directly with qmake on the command line.
+
+To build the Code Navigator using LeanQt and the BUSY build system instead, do the following:
+
+1. Create a new directory; we call it the root directory here
+1. Download https://github.com/rochus-keller/LisaPascal/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "LisaPascal".
+1. Download https://github.com/rochus-keller/LeanQt/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "LeanQt".
+1. Download https://github.com/rochus-keller/BUSY/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "build".
+1. Open a command line in the build directory and type `cc *.c -O2 -lm -O2 -o lua` or `cl /O2 /MD /Fe:lua.exe *.c` depending on whether you are on a Unix or Windows machine; wait a few seconds until the Lua executable is built.
+1. Now type `./lua build.lua ../LisaPascal -T ide` (or `lua build.lua ../LisaPascal -T ide` on Windows); wait until the LisaCodeNavigator executable is built; you find it in the output subdirectory.
 
 #### Support
 If you need support or would like to post issues or feature requests please use the Github issue list at https://github.com/rochus-keller/LisaPascal/issues or send an email to the author.

@@ -36,18 +36,18 @@ namespace Lisa
         quint8 d_type; // TokenType
 #endif
         quint8 d_len;
-        quint16 d_id;
         quint32 d_lineNr : RowCol::ROW_BIT_LEN;
         quint32 d_colNr : RowCol::COL_BIT_LEN;
         QString d_sourcePath;
 
-        QByteArray d_val; // using raw utf8 values pointing to buffered file content
+        QByteArray d_val;
+        const char* d_id; // lower-case internalized version of d_val
         Token(quint16 t = Tok_Invalid, quint32 line = 0, quint16 col = 0, const QByteArray& val = QByteArray()):
             d_type(t), d_lineNr(line),d_colNr(col),d_val(val),d_len(0),d_id(0){}
         bool isValid() const { return d_type != Tok_Eof && d_type != Tok_Invalid; }
         RowCol toLoc() const { return RowCol(d_lineNr,d_colNr); }
 
-        static quint16 toId(const QByteArray& ident);
+        static const char* toId(const QByteArray& ident);
     };
 }
 

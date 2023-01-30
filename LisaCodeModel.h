@@ -35,7 +35,7 @@ class Thing
 {
 public:
     enum Type { Undefined,
-       /* Declaration: */ Const, Type, Var, Func, Proc, Param, Label, Field, TypeAlias,
+       /* Declaration: */ Const, Type, Var, Func, Proc, Param, Label, Field, Module,
        /* Scope: */ Interface, Implementation, Body,
        /* UnitFile: */ Unit,
        /* IncludeFile: */ Include,
@@ -48,7 +48,7 @@ public:
     virtual quint16 getLen() const { return 0; }
     virtual QString getName() const;
     virtual const FileSystem::File* getFile() const { return 0; }
-    bool isDeclaration() const { return d_type >= Const && d_type <= TypeAlias; }
+    bool isDeclaration() const { return d_type >= Const && d_type <= Module; }
     const char* typeName() const;
     Thing():d_type(Undefined),d_external(false){}
     virtual ~Thing();
@@ -59,6 +59,7 @@ class Declaration : public Thing
 public:
     Scope* d_body; // owns
     QByteArray d_name;
+    const char* d_id; // same as in Token
 
     FilePos d_loc; // place in unit or any include file where the decl is actually located
     Scope* d_owner;
@@ -73,7 +74,7 @@ public:
     QString getName() const;
 
     UnitFile* getUnitFile() const; // only for ownership, not for actual file position
-    Declaration():d_body(0),d_owner(0),d_me(0){}
+    Declaration():d_body(0),d_owner(0),d_me(0),d_id(0){}
     ~Declaration();
 };
 
@@ -83,10 +84,10 @@ public:
     QList<Declaration*> d_order; // owns
     Thing* d_owner; // either declaration or unit file
     Scope* d_outer;
-    mutable QHash<QByteArray,Declaration*> d_cache;
 
     UnitFile* getUnitFile() const;
-    Declaration* findDecl(const QByteArray& name , bool withImports = true) const;
+    Declaration* findDecl(const char* id, bool withImports = true) const;
+    void clear();
     Scope():d_owner(0),d_outer(0){}
     ~Scope();
 };
@@ -132,6 +133,7 @@ class UnitFile : public CodeFile
 public:
     Scope* d_intf; // owns, 0 for Program
     Scope* d_impl; // owns
+    Scope* d_globals;
     QList<UnitFile*> d_import;
     typedef QList<Symbol*> SymList;
     QHash<QString,SymList> d_syms; // owns, all things we can click on in a code file ordered by row/col
@@ -139,7 +141,7 @@ public:
 
     QString getName() const;
     QByteArrayList findUses() const;
-    UnitFile():d_intf(0),d_impl(0) { d_type = Unit; }
+    UnitFile():d_intf(0),d_impl(0),d_globals(0) { d_type = Unit; }
     ~UnitFile();
 };
 
@@ -170,6 +172,7 @@ public:
     quint32 getSloc() const { return d_sloc; }
     CodeFile* getCodeFile(const QString& path) const;
     UnitFile* getUnitFile(const QString& path) const;
+    Scope* getGlobals() { return &d_globals; }
 
     // overrides
     int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
@@ -197,6 +200,7 @@ private:
     Slot d_root;
     FileSystem* d_fs;
     CodeFolder d_top;
+    Scope d_globals;
     QHash<const FileSystem::File*,UnitFile*> d_map1;
     QHash<QString,CodeFile*> d_map2; // real path -> file
     quint32 d_sloc; // number of lines of code without empty or comment lines

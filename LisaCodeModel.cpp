@@ -36,6 +36,7 @@ public:
     void visit( UnitFile* cf, SynTree* top )
     {      
         d_cf = cf;
+        cf->d_globals = d_mdl->getGlobals();
         if( top->d_children.isEmpty() )
             return;
         switch(top->d_children.first()->d_tok.d_type)
@@ -51,6 +52,7 @@ public:
             break;
         }
     }
+private:
     void program( UnitFile* cf, SynTree* st )
     {
         Scope* s = new Scope();
@@ -67,13 +69,52 @@ public:
             case SynTree::R_statement_part:
                 statement_part(cf->d_impl,st->d_children[i]);
                 break;
+            case SynTree::R_program_heading:
+                module_heading(cf,st->d_children[i]);
+                break;
+            case SynTree::R_uses_clause:
+                uses_clause(cf,st->d_children[i]);
+                break;
             }
         }
     }
+    void module_heading(UnitFile* cf, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == Tok_identifier)
+                addDecl(cf->d_globals,s->d_tok,Thing::Module);
+    }
+    void uses_clause(UnitFile* cf, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_identifier_list2)
+                identifier_list2(cf,s);
+    }
+    void identifier_list2(UnitFile* cf, SynTree* st)
+    {
+        int i = 0;
+        QList<SynTree*> idents;
+        while( i < st->d_children.size())
+        {
+            SynTree* id = st->d_children[i];
+            if( id->d_tok.d_type == Tok_identifier )
+                idents.push_back(id);
+            else if( id->d_tok.d_type == Tok_Slash )
+                idents.pop_back();
+            i++;
+        }
+        foreach(SynTree* s, idents)
+        {
+            addSym(cf->d_globals,s->d_tok);
+        }
+    }
+
     void regular_unit( UnitFile* cf, SynTree* st )
     {
         foreach( SynTree* s, st->d_children )
         {
+            if( s->d_tok.d_type == SynTree::R_unit_heading)
+                module_heading(cf,s);
             if( s->d_tok.d_type == SynTree::R_interface_part)
                 interface_part(cf,s);
             if( s->d_tok.d_type == SynTree::R_implementation_part)
@@ -88,6 +129,8 @@ public:
         cf->d_intf = newScope;
         foreach( SynTree* s, st->d_children )
         {
+            if( s->d_tok.d_type == SynTree::R_uses_clause)
+                uses_clause(cf,s);
             if( s->d_tok.d_type == SynTree::R_constant_declaration_part)
                 constant_declaration_part(newScope,s);
             if( s->d_tok.d_type == SynTree::R_type_declaration_part)
@@ -198,14 +241,14 @@ public:
             if( s->d_tok.d_type == SynTree::R_type_declaration)
                 type_declaration(scope,s);
     }
-    Declaration* findInterface(Scope* scope, const Token&t)
+    Declaration* findInInterface(Scope* scope, const Token&t)
     {
         if( d_cf->d_intf && scope == d_cf->d_impl )
         {
             Declaration* res = 0;
             foreach( Declaration* d, d_cf->d_intf->d_order )
             {
-                if( d->d_name == t.d_val )
+                if( d->d_id == t.d_id )
                 {
                     res = d;
                     break;
@@ -221,13 +264,14 @@ public:
         Declaration* d = new Declaration();
         d->d_type = type;
         d->d_name = t.d_val;
+        d->d_id = t.d_id;
         d->d_loc.d_pos = t.toLoc();
         d->d_loc.d_filePath = t.d_sourcePath;
         d->d_owner = scope;
         scope->d_order.append(d);
 
         // each decl is also a symbol
-        if( Declaration* intf = findInterface(scope,t) )
+        if( Declaration* intf = findInInterface(scope,t) )
         {
             // add the present symbol which points to the interface twin
             Symbol* sy = new Symbol();
@@ -300,9 +344,9 @@ public:
     }
     void enumerated_type(Scope* scope, SynTree* st)
     {
-        QList<Token> ids = identifier_list(st);
-        foreach( const Token& t, ids )
-            addDecl(scope,t,Thing::Const);
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_identifier_list)
+                identifier_list(scope,s, Thing::Const);
     }
 
     void string_type(Scope* scope, SynTree* st)
@@ -335,23 +379,121 @@ public:
     }
     void array_type(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_index_type && !s->d_children.isEmpty())
+                ordinal_type(scope,s->d_children.first());
+            if( s->d_tok.d_type == SynTree::R_type_)
+                type_(scope,s);
+        }
     }
+    void ordinal_type(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_simple_type)
+                simple_type(scope,s);
+    }
+
     void record_type(Scope* scope, SynTree* st)
     {
-        // TODO
+        // TODO: fields must go in a new isolated scope
+        Scope tmp;
+        tmp.d_outer = scope; // to resolve expressions
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_field_list)
+                field_list(&tmp,s);
+    }
+    void field_list(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_fixed_part)
+                fixed_part(scope,s);
+            if( s->d_tok.d_type == SynTree::R_variant_part)
+                variant_part(scope,s);
+        }
+    }
+    void fixed_part(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_field_declaration)
+                field_declaration(scope,s);
+    }
+    void field_declaration(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_identifier_list)
+                identifier_list(scope,s,Thing::Field);
+            if( s->d_tok.d_type == SynTree::R_type_)
+                type_(scope,s);
+        }
+    }
+
+    void variant_part(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_tag_field)
+                type_identifier(scope,s); // just an ident in a box
+            if( s->d_tok.d_type == SynTree::R_type_identifier)
+                type_identifier(scope,s);
+            if( s->d_tok.d_type == SynTree::R_variant)
+                variant(scope,s);
+        }
+    }
+    void variant(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_case_label_list)
+                case_label_list(scope,s);
+            if( s->d_tok.d_type == SynTree::R_field_list)
+                field_list(scope,s);
+        }
+    }
+    void case_label_list(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_constant)
+                constant(scope,s);
     }
     void set_type(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_ordinal_type)
+                ordinal_type(scope,s);
     }
     void file_type(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_type_)
+                type_(scope,s);
     }
     void class_type(Scope* scope, SynTree* st)
     {
-        // TODO
+        Scope tmp; // TODO isolated scope
+        tmp.d_outer = scope;
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_type_identifier)
+                type_identifier(scope,s);
+            if( s->d_tok.d_type == SynTree::R_field_list)
+                field_list(&tmp,s);
+            if( s->d_tok.d_type == SynTree::R_method_interface)
+                method_interface(scope,s);
+        }
+    }
+    void method_interface(Scope* scope, SynTree* st)
+    {
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_procedure_heading)
+                procedure_heading(scope,s);
+            if( s->d_tok.d_type == SynTree::R_function_heading)
+                function_heading(scope,s);
+            // the identifier is just a pseudo keyword
+        }
     }
     void pointer_type(Scope* scope, SynTree* st)
     {
@@ -370,22 +512,19 @@ public:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_identifier_list)
-            {
-                QList<Token> names = identifier_list(s);
-                foreach( const Token& t, names )
-                    addDecl(scope, t, Thing::Var);
-            }
+                identifier_list(scope,s,Thing::Var);
             if( s->d_tok.d_type == SynTree::R_type_)
                 type_(scope,s);
         }
     }
-    QList<Token> identifier_list(SynTree* st)
+    void identifier_list(Scope* scope, SynTree* st, int type)
     {
         QList<Token> res;
         foreach( SynTree* s, st->d_children )
             if( s->d_tok.d_type == Tok_identifier)
                 res.append(s->d_tok);
-        return res;
+        foreach( const Token& t, res )
+            addDecl(scope, t, type);
     }
 
     void procedure_and_function_declaration_part( Scope* scope, SynTree* st)
@@ -403,12 +542,12 @@ public:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                procedure_heading(scope,s);
+                scope = procedure_heading(scope,s); // overwrite the scope for the body
             if( s->d_tok.d_type == SynTree::R_body_)
                 body_(scope,s);
         }
     }
-    void procedure_heading(Scope* scope, SynTree* st)
+    Scope* procedure_heading(Scope* scope, SynTree* st)
     {
         Token id = findIdent(st);
         Declaration* d = addDecl(scope,id, Thing::Proc);
@@ -419,6 +558,7 @@ public:
         foreach( SynTree* s, st->d_children )
             if( s->d_tok.d_type == SynTree::R_formal_parameter_list)
                 formal_parameter_list(d->d_body, s);
+        return d->d_body;
     }
     void formal_parameter_list(Scope* scope, SynTree* st)
     {
@@ -443,18 +583,14 @@ public:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_identifier_list)
-            {
-                QList<Token> names = identifier_list(s);
-                foreach( const Token& t, names )
-                    addDecl(scope, t, Thing::Param);
-            }
+                identifier_list(scope,s,Thing::Param);
             if( s->d_tok.d_type == SynTree::R_type_identifier)
                 type_identifier(scope,s);
         }
     }
     Symbol* addSym(Scope* scope, const Token& t)
     {
-        Declaration* d = scope->findDecl(t.d_val);
+        Declaration* d = scope->findDecl(t.d_id);
         if( d )
         {
             Symbol* sy = new Symbol();
@@ -477,7 +613,7 @@ public:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_function_heading)
-                function_heading(scope,s);
+                scope = function_heading(scope,s); // overwrite the scope by
             if( s->d_tok.d_type == SynTree::R_body_)
                 body_(scope,s);
         }
@@ -492,7 +628,7 @@ public:
         }
         return t;
     }
-    void function_heading(Scope* scope, SynTree* st)
+    Scope* function_heading(Scope* scope, SynTree* st)
     {
         Token id = findIdent(st);
         Declaration* d = addDecl(scope,id, Thing::Func);
@@ -503,6 +639,7 @@ public:
         foreach( SynTree* s, st->d_children )
             if( s->d_tok.d_type == SynTree::R_formal_parameter_list)
                 formal_parameter_list(d->d_body, s);
+        return d->d_body;
     }
     void body_(Scope* scope, SynTree* st)
     {
@@ -645,15 +782,29 @@ public:
     }
     void case_limb(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_case_label_list)
+                case_label_list(scope,s);
+            if( s->d_tok.d_type == SynTree::R_statement)
+                statement(scope,s);
+        }
     }
     void otherwise_clause(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+            if( s->d_tok.d_type == SynTree::R_statement)
+                statement(scope,s);
     }
     void with_statement(Scope* scope, SynTree* st)
     {
-        // TODO
+        foreach( SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == SynTree::R_variable_reference)
+                variable_reference(scope,s);
+            if( s->d_tok.d_type == SynTree::R_statement)
+                statement(scope,s); // TODO: this needs a prepared scope
+        }
     }
     void assigOrCall(Scope* scope, SynTree* st)
     {
@@ -781,6 +932,7 @@ bool CodeModel::load(const QString& rootDir)
     beginResetModel();
     d_root = Slot();
     d_top.clear();
+    d_globals.clear();
     d_map1.clear();
     d_map2.clear();
     d_sloc = 0;
@@ -820,6 +972,7 @@ Symbol*CodeModel::findSymbolBySourcePos(const QString& path, int line, int col) 
     if( uf == 0 )
         return 0;
 
+    // TODO maybe make that faster by ordering by rowcol and e.g. binary search
     const UnitFile::SymList& syms = uf->d_syms.value(path);
     foreach( Symbol* s, syms )
     {
@@ -827,8 +980,7 @@ Symbol*CodeModel::findSymbolBySourcePos(const QString& path, int line, int col) 
                 s->d_loc.d_col <= col && col < s->d_loc.d_col + s->d_decl->getLen() )
             return s;
     }
-
-    return 0; // TODO
+    return 0;
 }
 
 CodeFile*CodeModel::getCodeFile(const QString& path) const
@@ -1011,7 +1163,7 @@ void CodeModel::parseAndResolve(UnitFile* unit)
     d_sloc += lex.getSloc();
 
     CodeModelVisitor v(this);
-    v.visit(unit,&p.d_root);
+    v.visit(unit,&p.d_root); // visit takes ~8% more time than just parsing
 
     QCoreApplication::processEvents();
 }
@@ -1142,7 +1294,8 @@ UnitFile::~UnitFile()
 
 UnitFile*Scope::getUnitFile() const
 {
-    Q_ASSERT( d_owner != 0 );
+    if( d_owner == 0 )
+        return 0; // happens in global scope
     if( d_owner->d_type == Thing::Unit )
         return static_cast<UnitFile*>(d_owner);
     else if( d_owner->isDeclaration() )
@@ -1154,51 +1307,49 @@ UnitFile*Scope::getUnitFile() const
         Q_ASSERT(false);
 }
 
-Declaration*Scope::findDecl(const QByteArray& name, bool withImports) const
+Declaration*Scope::findDecl(const char* id, bool withImports) const
 {
-#if 1
-    // Cache effect is about 2-5%, too expensive for effect
-    Declaration* d = d_cache.value(name);
-    if( d )
-        return d;
-#endif
     foreach( Declaration* d, d_order )
     {
-        if( d->d_name == name )
-        {
-            d_cache.insert(name,d);
+        if( d->d_id == id )
             return d;
-        }
     }
     if( d_outer )
-        return d_outer->findDecl(name);
+        return d_outer->findDecl(id);
 
-    // return 0; // TODO: the following is still too slow (takes ~ 30% longer)
+    UnitFile* cf = getUnitFile();
+    if( cf == 0 )
+        return 0; // TODO: this happens, check
+
     if( withImports )
     {
-        UnitFile* cf = getUnitFile();
-        if( cf == 0 )
-            return 0; // TODO: this happens, check
+        // searching through imports takes ~12% more time
         foreach( UnitFile* imp, cf->d_import )
         {
             if( imp->d_intf )
             {
-                Declaration* d = imp->d_intf->findDecl(name,false); // don't follow imports of imports
+                Declaration* d = imp->d_intf->findDecl(id,false); // don't follow imports of imports
                 if( d )
-                {
-                    d_cache.insert(name,d);
                     return d;
-                }
             }
         }
     }
+    if( false ) // cf->d_globals )
+        // not actually needed since uses resolution goes directly to globals
+        return cf->d_globals->findDecl(id, false);
     return 0;
+}
+
+void Scope::clear()
+{
+    for( int i = 0; i < d_order.size(); i++ )
+        delete d_order[i];
+    d_order.clear();
 }
 
 Scope::~Scope()
 {
-    for( int i = 0; i < d_order.size(); i++ )
-        delete d_order[i];
+    clear();
 }
 
 QString Declaration::getName() const
@@ -1262,8 +1413,14 @@ const char*Thing::typeName() const
         return "Function";
     case Proc:
         return "Procedure";
+    case Module:
+        return "Module";
+    case Param:
+        return "Parameter";
+    case Field:
+        return "Field";
     default:
-        return ""; // TODO
+        return "";
     }
 }
 

@@ -122,7 +122,7 @@ namespace Lisa {
 		};
 		SynTree(quint16 r = Tok_Invalid, const Token& = Token() );
 		SynTree(const Token& t ):d_tok(t){}
-		~SynTree() { foreach(SynTree* n, d_children) delete n; }
+        ~SynTree() { foreach(SynTree* n, d_children) delete n; }
 
 		static const char* rToStr( quint16 r );
 

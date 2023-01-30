@@ -19,19 +19,16 @@
 #include <QHash>
 #include <QtDebug>
 
-static quint32 s_maxId = 0;
-static QHash<QByteArray,quint16> s_dir;
+static QHash<QByteArray,QByteArray> d_symbols;
 
 
-quint16 Lisa::Token::toId(const QByteArray& ident)
+const char* Lisa::Token::toId(const QByteArray& ident)
 {
-    quint16& id = s_dir[ ident.toLower() ];
-    if( id == 0 )
-    {
-        if( ++s_maxId > 0xffff )
-            qWarning() << "Lisa::Token::toId: run out of IDs, required" << s_maxId;
-        else
-            id = s_maxId;
-    }
-    return id;
+    if( ident.isEmpty() )
+        return "";
+    const QByteArray lc = ident.toLower();
+    QByteArray& sym = d_symbols[lc];
+    if( sym.isEmpty() )
+        sym = lc;
+    return sym.constData();
 }

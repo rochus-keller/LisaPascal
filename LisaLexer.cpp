@@ -174,7 +174,7 @@ Token Lexer::token(TokenType tt, int len, const QByteArray& val)
     d_lastToken = t;
     d_colNr += len;
     t.d_len = len;
-#if 0
+#if 1
     if( tt == Tok_identifier )
         t.d_id = Token::toId(val);
 #endif
