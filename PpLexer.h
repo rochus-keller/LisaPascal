@@ -19,6 +19,7 @@
 
 #include "FileSystem.h"
 #include "LisaLexer.h"
+#include "LisaRowCol.h"
 
 class QIODevice;
 
@@ -31,6 +32,12 @@ class PpLexer
 public:
     enum PpSym { PpNone, PpIncl, PpSetc, PpIfc, PpElsec, PpEndc };
     typedef QHash<QByteArray,int> PpVars;
+    struct Include
+    {
+        const FileSystem::File* d_file;
+        RowCol d_loc;
+        quint16 d_len;
+    };
 
 
     PpLexer(FileSystem*);
@@ -41,10 +48,11 @@ public:
     Token nextToken();
     Token peekToken(quint8 lookAhead = 1);
     quint32 getSloc() const { return d_sloc; }
+    const QList<Include>& getIncludes() const { return d_includes; }
 protected:
     Token nextTokenImp();
     static PpSym checkPp(QByteArray&);
-    bool handleInclude(const QByteArray& data, const QString& sourcePath);
+    bool handleInclude(const QByteArray& data, const Token& t);
     bool handleSetc(const QByteArray& data);
     bool handleIfc(const QByteArray& data);
     bool handleElsec();
@@ -94,7 +102,7 @@ private:
     quint32 d_sloc; // number of lines of code without empty or comment lines
     PpVars d_ppVars;
     QList<ppstatus> d_conditionStack;
-
+    QList<Include> d_includes;
 };
 }
 

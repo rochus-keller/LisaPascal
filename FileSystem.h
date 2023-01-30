@@ -40,6 +40,7 @@ public:
         void dump(int level = 0) const;
         Dir* subdir(const QString& name) const;
         const File* file(const QString& name) const;
+        const File* module(const QByteArray& nameLc) const;
         Dir() {}
         ~Dir() { clear(); }
     };
@@ -48,10 +49,18 @@ public:
     struct File
     {
         quint8 d_type;
+        bool d_doublette;
+        bool d_forceParse;
+        bool d_parsed;
         QString d_realPath;
-        QString d_name;
+        QString d_name; // fileName
+        QString d_moduleName;
+        QByteArray d_moduleLc; // lower-case version
         Dir* d_dir;
-        QString getVirtualPath() const;
+        QString getVirtualPath(bool suffix = true) const;
+        int level() const;
+
+        File():d_doublette(false),d_type(UnknownFile),d_dir(0),d_forceParse(false),d_parsed(false){}
     };
 
     explicit FileSystem(QObject *parent = 0);
@@ -62,8 +71,9 @@ public:
     QList<const File*> getAllPas() const;
     const File* findFile(const QString& realPath) const;
     const File* findFile(const Dir* startFrom, const QString& dir, const QString& name) const;
+    const File* findModule(const Dir* startFrom, const QByteArray& nameLc) const;
 
-    static FileType detectType(QIODevice* in);
+    static FileType detectType(QIODevice* in, QByteArray* = 0);
 protected:
     bool error( const QString& );
     Dir* getDir( const QString& relPath );
@@ -72,7 +82,8 @@ private:
     QString d_rootDir;
     QString d_error;
     Dir d_root;
-    QHash<QString,File*> d_map;
+    QHash<QString,File*> d_fileMap;
+    QHash<QByteArray,File*> d_moduleMap; // module to File* is ambig, but besides "prmgr" (nearly) identical
 };
 }
 

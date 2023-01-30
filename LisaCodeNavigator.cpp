@@ -36,7 +36,10 @@
 #include <QFileDialog>
 #include <QTimer>
 #include <QElapsedTimer>
+#include <QScrollBar>
 using namespace Lisa;
+
+Q_DECLARE_METATYPE(Symbol*)
 
 static CodeNavigator* s_this = 0;
 static void report(QtMsgType type, const QString& message )
@@ -79,8 +82,8 @@ static QList<QByteArray> s_builtIns = QList<QByteArray>() << "ABS" << "ARCTAN" <
                                                           << "PWROFTEN" << "LENGTH" << "POS" << "CONCAT"
                                                           << "COPY" << "DELETE" << "INSERT" << "MOVELEFT"
                                                           << "MOVERIGHT" << "SIZEOF" << "SCANEQ" << "SCANNE"
-                                                          << "FILLCHAR"
-                                                          << "ABSTRACT" << "CLASSWIDE" << "OVERRIDE" << "DEFAULT";
+                                                          << "FILLCHAR";
+static QList<QByteArray> s_keywords = QList<QByteArray>() << "ABSTRACT" << "CLASSWIDE" << "OVERRIDE" << "DEFAULT";
 
 class CodeNavigator::Viewer : public QPlainTextEdit
 {
@@ -89,7 +92,7 @@ public:
     typedef QList<QTextEdit::ExtraSelection> ESL;
     ESL d_link, d_nonTerms;
     CodeNavigator* d_that;
-    Declaration* d_goto;
+    Symbol* d_goto;
     Highlighter* d_hl;
     QString d_find;
 
@@ -103,6 +106,8 @@ public:
         d_hl = new Highlighter( document() );
         foreach( const QByteArray& w, s_builtIns )
             d_hl->addBuiltIn(w);
+        foreach( const QByteArray& w, s_keywords )
+            d_hl->addKeyword(w);
         QFont f; // TODO
         f.setStyleHint( QFont::TypeWriter );
         f.setFamily("Mono");
@@ -141,13 +146,13 @@ public:
             {
                 const int off = cur.positionInBlock() + 1 - id->d_loc.d_col;
                 cur.setPosition(cur.position() - off);
-                cur.setPosition( cur.position() + id->d_decl->d_name.size(), QTextCursor::KeepAnchor );
+                cur.setPosition( cur.position() + id->d_decl->getLen(), QTextCursor::KeepAnchor );
 
                 QTextEdit::ExtraSelection sel;
                 sel.cursor = cur;
                 sel.format.setFontUnderline(true);
                 d_link << sel;
-                d_goto = id->d_decl;
+                d_goto = id;
                 if( !alreadyArrow )
                     QApplication::setOverrideCursor(Qt::ArrowCursor);
             }
@@ -165,21 +170,22 @@ public:
     void mousePressEvent(QMouseEvent* e)
     {
         QPlainTextEdit::mousePressEvent(e);
+        QTextCursor cur = cursorForPosition(e->pos());
+        d_that->pushLocation( CodeNavigator::Place( d_path, RowCol(cur.blockNumber(), cur.positionInBlock()),
+                                                    verticalScrollBar()->value() ) );
         if( !d_link.isEmpty() )
         {
             QApplication::restoreOverrideCursor();
             d_link.clear();
             Q_ASSERT( d_goto );
-            setCursorPosition( d_goto->d_loc, d_goto->getCodeFile()->d_file->d_realPath, true );
+            setCursorPosition( d_goto->d_decl->getLoc(), d_goto->d_decl->getFilePath(), true );
         }else if( QApplication::keyboardModifiers() == Qt::ControlModifier )
         {
-            QTextCursor cur = cursorForPosition(e->pos());
             Symbol* id = that()->d_mdl->findSymbolBySourcePos(
                         d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
             if( id && id->d_decl )
             {
-                //pushLocation( Location( cur.blockNumber(), cur.positionInBlock() ) );
-                setCursorPosition( id->d_loc, id->d_decl->getCodeFile()->d_file->d_realPath, true );
+                setCursorPosition( id->d_decl->getLoc(), id->d_decl->getFilePath(), true );
             }
         }else
             updateExtraSelections();
@@ -219,6 +225,7 @@ public:
                 centerCursor();
             else
                 ensureCursorVisible();
+            updateExtraSelections();
         }
     }
 
@@ -239,6 +246,42 @@ public:
                 ensureCursorVisible();
             updateExtraSelections();
         }
+    }
+
+    void markNonTermsFromCursor()
+    {
+        QTextCursor cur = textCursor();
+        Symbol* id = that()->d_mdl->findSymbolBySourcePos(d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
+        if( id && id->d_decl && id->d_decl->isDeclaration() )
+        {
+            Declaration* d = static_cast<Declaration*>(id->d_decl);
+            CodeFile* cf = that()->d_mdl->getCodeFile(d_path);
+            QList<Symbol*> syms = d->d_refs.value(cf);
+            markNonTerms(syms);
+        }
+    }
+
+    void markNonTerms(const QList<Symbol*>& s)
+    {
+        d_nonTerms.clear();
+        QTextCharFormat format;
+        format.setBackground( QColor(247,245,243).darker(120) );
+        foreach( const Symbol* n, s )
+        {
+            if( n->d_decl == 0 )
+                continue;
+            RowCol loc = n->d_decl->getLoc();
+            QTextCursor c( document()->findBlockByNumber( loc.d_row - 1) );
+            c.setPosition( c.position() + loc.d_col - 1 );
+            c.setPosition( c.position() + n->d_decl->getLen(), QTextCursor::KeepAnchor );
+
+            QTextEdit::ExtraSelection sel;
+            sel.format = format;
+            sel.cursor = c;
+
+            d_nonTerms << sel;
+        }
+        updateExtraSelections();
     }
 
     void find( bool fromTop )
@@ -289,6 +332,7 @@ CodeNavigator::CodeNavigator(QWidget *parent) : QMainWindow(parent),d_pushBackLo
 
     d_loc = new QLabel(this);
     d_loc->setMargin(2);
+    d_loc->setTextInteractionFlags(Qt::TextSelectableByMouse);
     vbox->addWidget(d_loc);
 
     d_view = new Viewer(this);
@@ -350,11 +394,11 @@ void CodeNavigator::open(const QString& sourceTreePath)
     d_view->clear();
     d_loc->clear();
     d_usedByTitle->clear();
-    d_cur = Place();
     d_backHisto.clear();
     d_forwardHisto.clear();
     d_dir = sourceTreePath;
-    setWindowTitle( tr("%3 - %1 v%2").arg( qApp->applicationName() ).arg( qApp->applicationVersion() )
+    QDir::setCurrent(sourceTreePath);
+   setWindowTitle( tr("%3 - %1 v%2").arg( qApp->applicationName() ).arg( qApp->applicationVersion() )
                     .arg( QDir(sourceTreePath).dirName() ));
     QTimer::singleShot(500,this,SLOT(onRunReload()));
 }
@@ -426,15 +470,90 @@ void CodeNavigator::createLog()
     new QShortcut(tr("ESC"), dock, SLOT(close()) );
 }
 
-void CodeNavigator::pushLocation(Symbol* s, const QString& path)
+void CodeNavigator::pushLocation(const Place& loc)
 {
-    if( d_pushBackLock || s == 0 )
+    if( d_pushBackLock )
         return;
-    if( d_cur.d_sym == s && d_cur.d_path == path )
-        return;
-    if( d_cur.d_sym )
-        d_backHisto.push_back( d_cur );
-    d_cur = Place(s,path);
+    if( !d_backHisto.isEmpty() && d_backHisto.last() == loc )
+        return; // o ist bereits oberstes Element auf dem Stack.
+    d_backHisto.removeAll( loc );
+    d_backHisto.push_back( loc );
+}
+
+static void setLoc( QLabel* l, const FileSystem::File* f)
+{
+    l->setText(QString("%1  -  %2").arg(f->getVirtualPath(true)).arg(f->d_realPath));
+}
+
+void CodeNavigator::showViewer(const CodeNavigator::Place& p)
+{
+    d_view->setCursorPosition( p.d_loc, p.d_path, false );
+    d_view->verticalScrollBar()->setValue(p.d_yoff);
+    const FileSystem::File* f = d_mdl->getFs()->findFile(p.d_path);
+    setLoc(d_loc, f);
+}
+
+void CodeNavigator::fillUsedBy(Declaration* nt)
+{
+    d_usedBy->clear();
+    if( !nt->d_name.isEmpty() )
+        d_usedByTitle->setText(QString("%1 '%2'").arg(nt->typeName()).arg(nt->d_name.data()) );
+    else
+        d_usedByTitle->setText(QString("%1").arg(nt->typeName()) );
+
+#if 0
+    // TODO
+    QList<const SynTree*> all = d_mdl->findReferencingSymbols( nt );
+    std::sort( all.begin(), all.end(), UsedByLessThan );
+
+    typedef QMap< QPair<QString,quint32>, QList<const SynTree*> > Groups;
+    Groups groups;
+
+    QList<const SynTree*> part;
+    foreach( const SynTree* id, all )
+    {
+        groups[qMakePair(id->d_tok.d_sourcePath,id->d_tok.d_lineNr)].append(id);
+        if( id->d_tok.d_sourcePath == d_view->d_path )
+            part << id;
+    }
+
+    Groups::const_iterator i;
+    QTreeWidgetItem* curItem = 0;
+    for( i = groups.begin(); i != groups.end(); ++i )
+    {
+        const SynTree* st = i.value().first();
+        QTreeWidgetItem* item = new QTreeWidgetItem(d_usedBy);
+        item->setText( 0, QString("%1 (%2 %3%4)").arg(QFileInfo(st->d_tok.d_sourcePath).fileName())
+                    .arg(st->d_tok.d_lineNr).arg( i.value().size() )
+                       .arg( st == nt->d_id ? " decl" : "" ) );
+        if( id && st->d_tok.d_lineNr == id->d_tok.d_lineNr &&
+                st->d_tok.d_sourcePath == id->d_tok.d_sourcePath )
+        {
+            QFont f = item->font(0);
+            f.setBold(true);
+            item->setFont(0,f);
+            curItem = item;
+        }
+        item->setToolTip( 0, item->text(0) );
+        item->setData( 0, Qt::UserRole, QVariant::fromValue(st) );
+        if( st->d_tok.d_sourcePath != d_view->d_path )
+            item->setForeground( 0, Qt::gray );
+        else if( curItem == 0 )
+            curItem = item;
+    }
+    if( curItem )
+        d_usedBy->scrollToItem( curItem );
+    if( id )
+    {
+        QTextCursor tc = d_view->textCursor();
+        const int line = tc.blockNumber() + 1;
+        const int col = positionInBlock(tc) + 1;
+        d_view->markNonTerms(part);
+        d_loc->setText( QString("%1   %2:%3   %5 '%4'").arg(d_view->d_path).arg(line).arg(col)
+                        .arg(id->d_tok.d_val.data() ).arg(nt->typeName().data() ) );
+        pushLocation(id);
+    }
+#endif
 }
 
 void CodeNavigator::closeEvent(QCloseEvent* event)
@@ -446,7 +565,20 @@ void CodeNavigator::closeEvent(QCloseEvent* event)
 
 void CodeNavigator::onCursorPositionChanged()
 {
-    // TODO
+    QTextCursor cur = d_view->textCursor();
+    const int line = cur.blockNumber() + 1;
+    const int col = cur.positionInBlock() + 1;
+    Symbol* id = d_mdl->findSymbolBySourcePos(d_view->d_path,line,col);
+    if( id && id->d_decl && id->d_decl->isDeclaration() )
+    {
+        fillUsedBy( static_cast<Declaration*>(id->d_decl) );
+
+        // TODO: redundant
+        Declaration* d = static_cast<Declaration*>(id->d_decl);
+        CodeFile* cf = d_mdl->getCodeFile(d_view->d_path);
+        QList<Symbol*> syms = d->d_refs.value(cf);
+        d_view->markNonTerms(syms);
+    }
 }
 
 void CodeNavigator::onModuleDblClick(const QModelIndex& i)
@@ -459,16 +591,21 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     if( nt->d_type == Thing::File )
     {
         const CodeFile* f = static_cast<const CodeFile*>(nt);
-        d_loc->setText(f->d_file->getVirtualPath());
-        d_loc->setToolTip(f->d_file->d_realPath);
+        setLoc(d_loc,f->d_file);
+        d_view->loadFile(f->d_file->d_realPath);
+    }else if( nt->d_type == Thing::Include )
+    {
+        const IncludeFile* f = static_cast<const IncludeFile*>(nt);
+        setLoc(d_loc,f->d_file);
         d_view->loadFile(f->d_file->d_realPath);
     }
+
 
     if( nt->isDeclaration() )
     {
         const Declaration* d = static_cast<const Declaration*>(nt);
-        FileSystem::File* f = d->getCodeFile()->d_file;
-        d_loc->setText(f->getVirtualPath());
+        const FileSystem::File* f = d->getCodeFile()->d_file;
+        setLoc(d_loc,f);
         d_view->setCursorPosition( d->d_loc, f->d_realPath, true );
     }
 #if 0
@@ -480,31 +617,36 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
 
 void CodeNavigator::onUsedByDblClicked()
 {
-    // TODO
+    if( d_usedBy->currentItem() == 0 )
+        return;
+
+    Symbol* st = d_usedBy->currentItem()->data(0,Qt::UserRole).value<Symbol*>();
+    if( st == 0 || st->d_decl == 0 )
+        return;
+    d_view->setCursorPosition( st->d_decl->getLoc(), st->d_decl->getFilePath(), true );
 }
 
 void CodeNavigator::onGoBack()
 {
-    if( d_backHisto.isEmpty() )
+    if( d_backHisto.size() <= 1 )
         return;
+
     d_pushBackLock = true;
-    Place last = d_backHisto.last();
+    d_forwardHisto.push_back( d_backHisto.last() );
     d_backHisto.pop_back();
-    d_forwardHisto.push_back( d_cur );
-    d_cur = last;
-    d_view->setCursorPosition( last.d_sym->d_loc, last.d_path, true );
+    showViewer(d_backHisto.last());
     d_pushBackLock = false;
+
 }
 
 void CodeNavigator::onGoForward()
 {
     if( d_forwardHisto.isEmpty() )
         return;
-    Place last = d_forwardHisto.last();
+    Place cur = d_forwardHisto.last();
     d_forwardHisto.pop_back();
-    d_backHisto.push_back( d_cur );
-    d_cur = last;
-    d_view->setCursorPosition( d_cur.d_sym->d_loc, d_cur.d_path, true );
+    showViewer(cur);
+    d_backHisto.push_back(cur);
 }
 
 void CodeNavigator::onGotoLine()
@@ -549,8 +691,11 @@ void CodeNavigator::onGotoDefinition()
     Symbol* id = d_mdl->findSymbolBySourcePos(
                 d_view->d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
     if( id && id->d_decl )
-        d_view->setCursorPosition( id->d_decl->d_loc,
-                                   id->d_decl->getCodeFile()->d_file->d_realPath, true );
+    {
+        d_view->setCursorPosition( id->d_decl->getLoc(),
+                                   id->d_decl->getFilePath(), true );
+        pushLocation(Place(id->d_decl->getFilePath(),id->d_decl->getLoc(),d_view->verticalScrollBar()->value()));
+    }
 #if 0
     // TODO
     if( id.second )
@@ -590,7 +735,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.2.0");
+    a.setApplicationVersion("0.3.0");
     a.setStyle("Fusion");
 
     QString dirPath;

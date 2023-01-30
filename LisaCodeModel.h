@@ -23,21 +23,13 @@
 #include <QAbstractItemModel>
 #include <QHash>
 #include <FileSystem.h>
+#include "LisaRowCol.h"
 
 namespace Lisa
 {
 class Scope;
 class CodeFile;
 class Symbol;
-
-struct RowCol
-{
-public:
-    enum { ROW_BIT_LEN = 19, COL_BIT_LEN = 32 - ROW_BIT_LEN };
-    quint32 d_row : ROW_BIT_LEN;
-    quint32 d_col : COL_BIT_LEN;
-    RowCol():d_row(0),d_col(0){}
-};
 
 class Thing
 {
@@ -46,13 +38,20 @@ public:
        /* Declaration: */ Const, Type, Var, Func, Proc, Param, Label, Field, TypeAlias,
        /* Scope: */ Interface, Implementation, Body,
        /* CodeFile: */ File,
+       /* IncludeFile: */ Include,
        /* CodeFolder: */ Folder
     };
     quint8 d_type;
     bool d_external; // Fund & Proc decls
 
+    virtual RowCol getLoc() const { return RowCol(); }
+    virtual QString getFilePath() const { return QString(); }
+    virtual quint16 getLen() const { return 0; }
+    virtual QString getName() const;
     bool isDeclaration() const { return d_type >= Const && d_type <= TypeAlias; }
+    const char* typeName() const;
     Thing():d_type(Undefined),d_external(false){}
+    virtual ~Thing();
 };
 
 class Declaration : public Thing
@@ -66,6 +65,10 @@ public:
     Scope* d_owner;
     QHash<CodeFile*,QList<Symbol*> > d_refs;
 
+    RowCol getLoc() const { return d_loc; }
+    QString getFilePath() const;
+    quint16 getLen() const { return d_name.size(); }
+    QString getName() const;
     CodeFile* getCodeFile() const;
     Declaration():d_impl(0),d_intf(0),d_body(0),d_owner(0){}
     ~Declaration();
@@ -74,12 +77,13 @@ public:
 class Scope : public Thing
 {
 public:
-    QHash<QByteArray,Declaration*> d_names;
     QList<Declaration*> d_order; // owns
     Thing* d_owner; // either declaration or codefile
     Scope* d_outer;
+    mutable QHash<QByteArray,Declaration*> d_cache;
 
     CodeFile* getCodeFile() const;
+    Declaration* findDecl(const QByteArray& name , bool withImports = true) const;
     Scope():d_owner(0),d_outer(0){}
     ~Scope();
 };
@@ -87,9 +91,24 @@ public:
 class Symbol
 {
 public:
-    Declaration* d_decl;
+    Thing* d_decl;
     RowCol d_loc;
     Symbol():d_decl(0){}
+};
+
+class IncludeFile : public Thing
+{
+public:
+    const FileSystem::File* d_file;
+    CodeFile* d_includer;
+    RowCol d_loc;
+    quint16 d_len;
+
+    RowCol getLoc() const { return d_loc; }
+    QString getFilePath() const;
+    quint16 getLen() const { return d_len; }
+    QString getName() const;
+    IncludeFile():d_file(0),d_includer(0),d_len(0){ d_type = Include; }
 };
 
 class CodeFile : public Thing
@@ -98,10 +117,13 @@ public:
     Scope* d_intf; // owns, 0 for Program
     Scope* d_impl; // owns
     QList<Symbol*> d_syms; // owns, all things we can click on in a code file ordered by row/col
-    FileSystem::File* d_file;
-    QList<Scope*> d_import;
+    const FileSystem::File* d_file;
+    QList<IncludeFile*> d_includes; // owns
+    QList<CodeFile*> d_import;
 
-    CodeFile():d_intf(0),d_impl(0),d_file(0){ d_type = File; }
+    QString getName() const;
+    QByteArrayList findUses() const;
+    CodeFile():d_intf(0),d_impl(0),d_file(0) { d_type = File; }
     ~CodeFile();
 };
 
@@ -112,6 +134,7 @@ public:
     QList<CodeFolder*> d_subs; // owns
     QList<CodeFile*> d_files; // owns
 
+    QString getName() const;
     void clear();
     CodeFolder():d_dir(0){ d_type = Folder; }
     ~CodeFolder() { clear(); }
@@ -128,6 +151,7 @@ public:
     Symbol* findSymbolBySourcePos(const QString& path, int line, int col) const;
     FileSystem* getFs() const { return d_fs; }
     quint32 getSloc() const { return d_sloc; }
+    CodeFile* getCodeFile(const QString& path) const;
 
     // overrides
     int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
@@ -138,7 +162,7 @@ public:
     Qt::ItemFlags flags ( const QModelIndex & index ) const;
 
 protected:
-    void parseAndResolve(const FileSystem::File*);
+    void parseAndResolve(CodeFile*);
 
 private:
     struct Slot
@@ -149,12 +173,13 @@ private:
         Slot(Slot* p = 0, Thing* t = 0):d_parent(p),d_thing(t){ if( p ) p->d_children.append(this); }
         ~Slot() { foreach( Slot* s, d_children ) delete s; }
     };
-    void fillTop();
+    static bool lessThan( const Slot* lhs, const Slot* rhs);
     void fillFolders(Slot* root, const FileSystem::Dir* super, CodeFolder* top, QList<Slot*>& fileSlots);
     Slot d_root;
     FileSystem* d_fs;
     CodeFolder d_top;
-    QHash<QString,CodeFile*> d_map; // real path -> file
+    QHash<const FileSystem::File*,CodeFile*> d_map1;
+    QHash<QString,CodeFile*> d_map2; // real path -> file
     quint32 d_sloc; // number of lines of code without empty or comment lines
 };
 }

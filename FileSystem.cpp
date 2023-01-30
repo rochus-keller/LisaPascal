@@ -67,7 +67,8 @@ bool FileSystem::load(const QString& rootDir)
         return error("not a directory");
 
     d_root.clear();
-    d_map.clear();
+    d_fileMap.clear();
+    d_moduleMap.clear();
 
     const QStringList files = collectFiles(rootDir,QStringList() << "*.txt");
     const int off = rootDir.size();
@@ -77,7 +78,8 @@ bool FileSystem::load(const QString& rootDir)
         QFile in(f);
         if( !in.open(QIODevice::ReadOnly) )
             return error(tr("cannot open file for reading: %1").arg(f));
-        const FileType fileType = detectType(&in);
+        QByteArray moduleName;
+        const FileType fileType = detectType(&in,&moduleName);
         if( fileType == UnknownFile )
             continue;
         in.close();
@@ -97,31 +99,65 @@ bool FileSystem::load(const QString& rootDir)
 
         QStringList parts = name.contains('-') ? name.split('-') : name.split('.');
 
+        File* file = new File();
+        file->d_type = fileType;
+        file->d_name = name;
+        file->d_moduleName = moduleName;
+        file->d_moduleLc = moduleName.toLower();
+        if( !file->d_moduleLc.isEmpty() )
+        {
+            File*& slot = d_moduleMap[file->d_moduleLc];
+            if( slot == 0 )
+                slot = file;
+            else
+            {
+                if( ( slot->d_moduleLc != slot->d_name && file->d_moduleLc == file->d_name)
+                      // prefer modules where name corresponds to file name
+                        || ( slot->level() < file->level() )
+                             // prefer modules deeper in the hierarchy
+                        )
+                {
+                    slot->d_doublette = true;
+                    slot = file;
+                }else
+                    file->d_doublette = true;
+            }
+        }
+        file->d_realPath = f;
+        d_fileMap[f] = file;
         if( parts.size() == 1 )
         {
             // file with no dir
             Dir* dir = getDir(relDirPath);
-            File* file = new File();
-            file->d_type = fileType;
-            file->d_name = name;
-            file->d_realPath = f;
             file->d_dir = dir;
             dir->d_files.append(file);
-            d_map[f] = file;
         }else if( parts.size() >= 2 )
         {
             Dir* dir = getDir(replaceLast(relDirPath,parts.front()));
             parts.pop_front();
-            const QString newName = parts.join('_');
-            File* file = new File();
-            file->d_type = fileType;
-            file->d_name = newName;
-            file->d_realPath = f;
+            file->d_name = parts.join('_');
             file->d_dir = dir;
             dir->d_files.append(file);
-            d_map[f] = file;
         }
     }
+
+#if 0
+    // print stats
+    QMap<int,int> count;
+    QHash<QByteArray,QList<File*> >::const_iterator i;
+    for( i = d_moduleMap.begin(); i != d_moduleMap.end(); ++i )
+    {
+        const QList<File*>& hits = i.value();
+        count[hits.size()]++;
+        if( hits.size() > 1 )
+        {
+            for(int j = 0; j < hits.size(); j++ )
+                qDebug() << i.key() << "\t" << hits.size() << "\t" << hits[j]->getVirtualPath();
+        }
+    }
+    qDebug() << count;
+#endif
+    return true;
 }
 
 static void walkForPas(const FileSystem::Dir* d, QList<const FileSystem::File*>& res )
@@ -142,7 +178,7 @@ QList<const FileSystem::File*> FileSystem::getAllPas() const
 
 const FileSystem::File*FileSystem::findFile(const QString& realPath) const
 {
-    return d_map.value(realPath);
+    return d_fileMap.value(realPath);
 }
 
 const FileSystem::File*FileSystem::findFile(const Dir* startFrom, const QString& dir, const QString& name) const
@@ -159,7 +195,40 @@ const FileSystem::File*FileSystem::findFile(const Dir* startFrom, const QString&
     return res;
 }
 
-FileSystem::FileType FileSystem::detectType(QIODevice* in)
+const FileSystem::File*FileSystem::findModule(const FileSystem::Dir* startFrom, const QByteArray& nameLc) const
+{
+    Q_ASSERT(startFrom);
+    const File* res = 0;
+    const Dir* d = startFrom;
+    if( res == 0 && d )
+    {
+        res = d->module(nameLc);
+        d = d->d_dir;
+    }
+    if( res == 0 )
+    {
+        res = d_moduleMap.value(nameLc);
+#if 0
+        // print stats; only works when d_moduleMap -> QList<File*>
+        static QSet<QByteArray> seen;
+        if( !seen.contains(nameLc) && tmp.size() != 1 )
+        {
+            if( tmp.size() == 0 )
+                qDebug() << "not_found" << nameLc;
+            else
+            {
+                for( int i = 0; i < tmp.size(); i++ )
+                    qDebug() << "ambiguous" << nameLc << tmp[i]->getVirtualPath();
+            }
+            seen.insert(nameLc);
+        }
+#endif
+    }else if( res->d_doublette )
+        const_cast<File*>(res)->d_forceParse = true;
+    return res;
+}
+
+FileSystem::FileType FileSystem::detectType(QIODevice* in, QByteArray* name)
 {
     Q_ASSERT(in);
     in->reset();
@@ -177,8 +246,22 @@ FileSystem::FileType FileSystem::detectType(QIODevice* in)
                 res = PascalFragment;
             break;
         case Tok_program:
+            if( name )
+            {
+                while( t.d_type != Tok_identifier && t.isValid() )
+                    t = lex.nextToken();
+                if( t.d_type == Tok_identifier )
+                    *name = t.d_val;
+            }
             return PascalProgram;
         case Tok_unit:
+            if( name )
+            {
+                while( t.d_type != Tok_identifier && t.isValid() )
+                    t = lex.nextToken();
+                if( t.d_type == Tok_identifier )
+                    *name = t.d_val;
+            }
             return PascalUnit;
         case Tok_function:
         case Tok_procedure:
@@ -276,7 +359,15 @@ const FileSystem::File*FileSystem::Dir::file(const QString& name) const
     return 0;
 }
 
-QString FileSystem::File::getVirtualPath() const
+const FileSystem::File*FileSystem::Dir::module(const QByteArray& nameLc) const
+{
+    for(int i = 0; i < d_files.size(); i++ )
+        if( d_files[i]->d_moduleLc == nameLc )
+            return d_files[i];
+    return 0;
+}
+
+QString FileSystem::File::getVirtualPath(bool suffix) const
 {
     const Dir* d = d_dir;
     QString res;
@@ -286,6 +377,19 @@ QString FileSystem::File::getVirtualPath() const
         d = d->d_dir;
     }
     res += d_name;
-    res += typeName(d_type);
+    if( suffix )
+        res += typeName(d_type);
+    return res;
+}
+
+int FileSystem::File::level() const
+{
+    int res = 0;
+    const Dir* d = d_dir;
+    while( d && !d->d_name.isEmpty() )
+    {
+        res++;
+        d = d->d_dir;
+    }
     return res;
 }

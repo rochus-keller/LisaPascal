@@ -163,7 +163,7 @@ static void runParser(const QString& root, const QString& path)
     {
         qDebug() << "ok";
     }
-#if 0
+#if 1
     QFile out(path + ".st");
     out.open(QIODevice::WriteOnly);
     QTextStream s(&out);

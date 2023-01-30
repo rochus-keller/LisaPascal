@@ -54,6 +54,11 @@ void Highlighter::addBuiltIn(const QByteArray& bi)
     d_builtins << bi;
 }
 
+void Highlighter::addKeyword(const QByteArray& kw)
+{
+    d_keywords << kw;
+}
+
 QTextCharFormat Highlighter::formatForCategory(int c) const
 {
     return d_format[c];
@@ -171,10 +176,13 @@ void Highlighter::highlightBlock(const QString& text)
             f = formatForCategory(C_Kw);
         }else if( t.d_type == Tok_identifier )
         {
+            const QByteArray& name = t.d_val.toUpper();
             /*if( i+1 < tokens.size() && tokens[i+1].d_type == Tok_Colon)
                 f = formatForCategory(C_Label);
-            else */if( d_builtins.contains(t.d_val.toUpper()) )
+            else */if( d_builtins.contains(name) )
                 f = formatForCategory(C_Type);
+            else if( d_keywords.contains(name) )
+                f = formatForCategory(C_Kw);
             else
                 f = formatForCategory(C_Ident);
         }

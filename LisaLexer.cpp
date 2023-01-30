@@ -139,7 +139,7 @@ Token Lexer::nextTokenImp()
 int Lexer::skipWhiteSpace()
 {
     const int colNr = d_colNr;
-    while( d_colNr < d_line.size() && ( ::isspace( d_line[d_colNr] ) || d_line[d_colNr] == 0xff ) )
+    while( d_colNr < d_line.size() && ( ::isspace( d_line[d_colNr] ) || d_line[d_colNr] == char(0xff) ) )
         d_colNr++;
     return d_colNr - colNr;
 }
@@ -174,6 +174,10 @@ Token Lexer::token(TokenType tt, int len, const QByteArray& val)
     d_lastToken = t;
     d_colNr += len;
     t.d_len = len;
+#if 0
+    if( tt == Tok_identifier )
+        t.d_id = Token::toId(val);
+#endif
     t.d_sourcePath = d_filePath;
     return t;
 }

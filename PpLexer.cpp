@@ -39,6 +39,7 @@ bool PpLexer::reset(const QString& filePath)
         delete d_files[i];
     d_files.clear();
     d_sloc = 0;
+    d_includes.clear();
 
     const FileSystem::File* f = d_fs->findFile(filePath);
     if( f == 0 )
@@ -103,7 +104,7 @@ Token PpLexer::nextTokenImp()
             const PpSym sym = checkPp(data);
             bool ok = true;
             if( sym == PpIncl )
-                ok = handleInclude(data,t.d_sourcePath);
+                ok = handleInclude(data,t);
             else if( sym == PpSetc )
                 ok = handleSetc(data);
             else if( sym == PpIfc )
@@ -214,12 +215,12 @@ PpLexer::PpSym PpLexer::checkPp(QByteArray& str)
     return res;
 }
 
-bool PpLexer::handleInclude(const QByteArray& data, const QString& sourcePath)
+bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
 {
     QString path = QString::fromUtf8(data).trimmed().toLower();
     if( path.endsWith(".text") )
         path.chop(5);
-    const FileSystem::File* f = d_fs->findFile(sourcePath);
+    const FileSystem::File* f = d_fs->findFile(t.d_sourcePath);
     Q_ASSERT( f );
     QStringList pathFile = path.split('/');
     const FileSystem::File* found = 0;
@@ -234,10 +235,16 @@ bool PpLexer::handleInclude(const QByteArray& data, const QString& sourcePath)
         found = d_fs->findFile(f->d_dir, pathFile[0], pathFile[1]);
     if( found == 0 )
     {
-        d_err = QString("file '%1' not found").arg(data.constData()).toUtf8();
+        d_err = QString("include file '%1' not found").arg(data.constData()).toUtf8();
         return false;
     }else
     {
+        Include inc;
+        inc.d_file = found;
+        inc.d_loc.d_row = t.d_lineNr;
+        inc.d_loc.d_col = t.d_colNr;
+        inc.d_len = t.d_val.size();
+        d_includes.append(inc);
         d_stack.push_back(Lexer());
         d_stack.back().setIgnoreComments(false);
         QFile* file = new QFile(found->d_realPath);

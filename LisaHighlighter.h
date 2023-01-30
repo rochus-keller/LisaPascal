@@ -31,6 +31,7 @@ namespace Lisa
         enum { TokenProp = QTextFormat::UserProperty };
         explicit Highlighter(QTextDocument *parent = 0);
         void addBuiltIn(const QByteArray& bi);
+        void addKeyword(const QByteArray& kw);
 
     protected:
         QTextCharFormat formatForCategory(int) const;
@@ -41,7 +42,7 @@ namespace Lisa
     private:
         enum Category { C_Num, C_Str, C_Kw, C_Type, C_Ident, C_Op, C_Pp, C_Cmt, C_Label, C_Max };
         QTextCharFormat d_format[C_Max];
-        QSet<QByteArray> d_builtins;
+        QSet<QByteArray> d_builtins, d_keywords;
     };
 
     class LogPainter : public QSyntaxHighlighter

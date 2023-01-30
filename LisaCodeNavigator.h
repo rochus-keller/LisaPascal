@@ -21,6 +21,7 @@
 */
 
 #include <QMainWindow>
+#include "LisaRowCol.h"
 
 class QLabel;
 class QPlainTextEdit;
@@ -32,6 +33,7 @@ namespace Lisa
 {
 class CodeModel;
 class Symbol;
+class Declaration;
 
 class CodeNavigator : public QMainWindow
 {
@@ -42,10 +44,24 @@ public:
     void logMessage(const QString&);
 
 protected:
+    struct Place
+    {
+        // Qt-Koordinaten
+        RowCol d_loc;
+        quint16 d_yoff;
+        QString d_path;
+        bool operator==( const Place& rhs ) { return d_loc.d_row == rhs.d_loc.d_row &&
+                    d_loc.d_col == rhs.d_loc.d_col && d_path == rhs.d_path; }
+        Place(const QString& f, RowCol loc, quint16 y ):d_path(f),d_loc(loc),d_yoff(y){}
+        Place():d_yoff(0) {}
+    };
+
     void createModuleList();
     void createUsedBy();
     void createLog();
-    void pushLocation( Symbol*, const QString& path );
+    void pushLocation( const Place& );
+    void showViewer( const Place& );
+    void fillUsedBy(Declaration*);
 
     // overrides
     void closeEvent(QCloseEvent* event);
@@ -74,14 +90,7 @@ private:
     CodeModel* d_mdl;
     QString d_dir;
 
-    struct Place
-    {
-        Symbol* d_sym;
-        QString d_path;
-        Place(Symbol* s = 0, const QString& p = QString() ):d_sym(s),d_path(p){}
-    };
-    Place d_cur;
-    QList<Place> d_backHisto;
+    QList<Place> d_backHisto; // d_backHisto.last() is current place
     QList<Place> d_forwardHisto;
     bool d_pushBackLock;
 };
