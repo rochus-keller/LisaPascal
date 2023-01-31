@@ -79,7 +79,7 @@ To build the Code Navigator using LeanQt and the BUSY build system (with no othe
 1. Download https://github.com/rochus-keller/LeanQt/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "LeanQt".
 1. Download https://github.com/rochus-keller/BUSY/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "build".
 1. Open a command line in the build directory and type `cc *.c -O2 -lm -O2 -o lua` or `cl /O2 /MD /Fe:lua.exe *.c` depending on whether you are on a Unix or Windows machine; wait a few seconds until the Lua executable is built.
-1. Now type `./lua build.lua ../LisaPascal -T ide` (or `lua build.lua ../LisaPascal -T ide` on Windows); wait until the LisaCodeNavigator executable is built; you find it in the output subdirectory.
+1. Now type `./lua build.lua ../LisaPascal` (or `lua build.lua ../LisaPascal` on Windows); wait until the LisaCodeNavigator executable is built; you find it in the output subdirectory.
 
 #### Support
 If you need support or would like to post issues or feature requests please use the Github issue list at https://github.com/rochus-keller/LisaPascal/issues or send an email to the author.
