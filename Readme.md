@@ -72,7 +72,7 @@ The executable can be built on all common platforms using regular Qt 5.x or usin
 
 The project includes the CodeNavigator.pro file which can be opened and built in Qt Creator or directly with qmake on the command line.
 
-To build the Code Navigator using LeanQt and the BUSY build system instead, do the following:
+To build the Code Navigator using LeanQt and the BUSY build system (with no other dependencies than a C++98 compiler) instead, do the following:
 
 1. Create a new directory; we call it the root directory here
 1. Download https://github.com/rochus-keller/LisaPascal/archive/refs/heads/master.zip and unpack it to the root directory; rename the resulting directory to "LisaPascal".

@@ -1,6 +1,7 @@
 # author: Rochus Keller (me@rochus-keller.ch)
 # License: GPL
-# See https://github.com/rochus-keller/LeanQt and https://github.com/rochus-keller/BUSY/blob/main/README.md on how to use this file
+# See https://github.com/rochus-keller/LisaPascal#how-to-build-the-parser-and-code-navigator and 
+# https://github.com/rochus-keller/BUSY/blob/main/README.md on how to use this file
 
 if busy_version < "2023-01-15" {
 	error("this version of BUSY is not compatible with this build")
@@ -35,6 +36,7 @@ let exe ! : Executable {
 		./LisaFileSystem.cpp 
 		./LisaPpLexer.cpp
 	]
+	.include_dirs += [ . .. ]
 	.deps += [ qt.copy_rcc qt.libqt run_rcc run_moc ]
 	.name = "LisaCodeNavigator"
 }
