@@ -38,6 +38,9 @@ let exe ! : Executable {
 	]
 	.include_dirs += [ . .. ]
 	.deps += [ qt.copy_rcc qt.libqt run_rcc run_moc ]
+	if target_os == `win32 {
+		.deps += qt.libqtwinmain
+	}
 	.name = "LisaCodeNavigator"
 }
 

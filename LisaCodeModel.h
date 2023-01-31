@@ -67,7 +67,7 @@ public:
     typedef QList<Symbol*> SymList;
     typedef QHash<QString,SymList> Refs;
     Refs d_refs; // file path -> Symbols in it
-    Symbol* d_me;
+    Symbol* d_me; // this is the symbol by which the decl itself is represented in the file
 
     FilePos getLoc() const { return d_loc; }
     quint16 getLen() const { return d_name.size(); }
@@ -84,11 +84,12 @@ public:
     QList<Declaration*> d_order; // owns
     Thing* d_owner; // either declaration or unit file
     Scope* d_outer;
+    Scope* d_altOuter; // to access params defined in interface declaration of func/proc
 
     UnitFile* getUnitFile() const;
     Declaration* findDecl(const char* id, bool withImports = true) const;
     void clear();
-    Scope():d_owner(0),d_outer(0){}
+    Scope():d_owner(0),d_outer(0),d_altOuter(0){}
     ~Scope();
 };
 

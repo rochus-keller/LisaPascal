@@ -30,6 +30,7 @@ class CodeModelVisitor
 {
     CodeModel* d_mdl;
     UnitFile* d_cf;
+    QHash<Declaration*,Declaration*> d_toIntf;
 public:
     CodeModelVisitor(CodeModel* m):d_mdl(m) {}
 
@@ -111,17 +112,18 @@ private:
 
     void regular_unit( UnitFile* cf, SynTree* st )
     {
+        Scope* interf = 0;
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_unit_heading)
                 module_heading(cf,s);
             if( s->d_tok.d_type == SynTree::R_interface_part)
-                interface_part(cf,s);
+                interf = interface_part(cf,s);
             if( s->d_tok.d_type == SynTree::R_implementation_part)
-                implementation_part(cf,s);
+                implementation_part(cf,interf,s);
         }
     }
-    void interface_part( UnitFile* cf, SynTree* st )
+    Scope* interface_part( UnitFile* cf, SynTree* st )
     {
         Scope* newScope = new Scope();
         newScope->d_owner = cf;
@@ -140,22 +142,24 @@ private:
             if( s->d_tok.d_type == SynTree::R_procedure_and_function_interface_part)
                 procedure_and_function_interface_part(newScope,s);
         }
+        return newScope;
     }
     void procedure_and_function_interface_part(Scope* scope, SynTree* st)
     {
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                procedure_heading(scope,s);
+                func_proc_heading(scope,s,Thing::Proc);
             if( s->d_tok.d_type == SynTree::R_function_heading)
-                function_heading(scope,s);
+                func_proc_heading(scope,s, Thing::Func);
         }
     }
-    void implementation_part( UnitFile* cf, SynTree* st )
+    void implementation_part( UnitFile* cf, Scope* intf, SynTree* st )
     {
         Scope* newScope = new Scope();
         newScope->d_owner = cf;
         newScope->d_type = Thing::Implementation;
+        newScope->d_outer = intf;
         cf->d_impl = newScope;
         foreach( SynTree* s, st->d_children )
         {
@@ -271,7 +275,8 @@ private:
         scope->d_order.append(d);
 
         // each decl is also a symbol
-        if( Declaration* intf = findInInterface(scope,t) )
+        Declaration* intf = 0;
+        if( (type == Thing::Proc || type == Thing::Func) && ( intf = findInInterface(scope,t) ) )
         {
             // add the present symbol which points to the interface twin
             Symbol* sy = new Symbol();
@@ -281,12 +286,23 @@ private:
             intf->d_refs[t.d_sourcePath].append(sy);
             d->d_me = sy;
 
-            // add a symbol for the interface twin pointing to the present declaration
-            sy = new Symbol();
-            sy->d_decl = d;
-            sy->d_loc = intf->d_loc.d_pos;
-            d_cf->d_syms[intf->d_loc.d_filePath].append(sy);
-            d->d_refs[intf->d_loc.d_filePath].append(sy);
+            d_toIntf[d] = intf;
+#if 0
+            // set the symbol for the interface twin pointing to the present declaration
+            if( intf->d_me )
+            {
+                intf->d_me->d_decl = d;
+                d->d_refs[intf->d_loc.d_filePath].append(intf->d_me);
+            }else
+            {
+                // never happens:
+                sy = new Symbol();
+                sy->d_decl = d;
+                sy->d_loc = intf->d_loc.d_pos;
+                d_cf->d_syms[intf->d_loc.d_filePath].append(sy);
+                d->d_refs[intf->d_loc.d_filePath].append(sy);
+            }
+#endif
         }else
         {
             Symbol* sy = new Symbol();
@@ -489,9 +505,9 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                procedure_heading(scope,s);
+                func_proc_heading(scope,s,Thing::Proc);
             if( s->d_tok.d_type == SynTree::R_function_heading)
-                function_heading(scope,s);
+                func_proc_heading(scope,s,Thing::Func);
             // the identifier is just a pseudo keyword
         }
     }
@@ -542,24 +558,36 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                scope = procedure_heading(scope,s); // overwrite the scope for the body
+                scope = func_proc_heading(scope,s,Thing::Proc); // overwrite the scope for the body
             if( s->d_tok.d_type == SynTree::R_body_)
                 body_(scope,s);
         }
     }
-    Scope* procedure_heading(Scope* scope, SynTree* st)
+    Scope* func_proc_heading(Scope* scope, SynTree* st, int type)
     {
         Token id = findIdent(st);
-        Declaration* d = addDecl(scope,id, Thing::Proc);
+        Declaration* d = addDecl(scope,id, type);
         d->d_body = new Scope();
         d->d_body->d_owner = d;
         d->d_body->d_outer = scope;
+        if( d->d_me && d->d_me->d_decl != d )
+        {
+            Q_ASSERT(d->d_me->d_decl->isDeclaration());
+            Declaration* intf = static_cast<Declaration*>(d->d_me->d_decl);
+
+            d->d_body->d_altOuter = intf->d_body;
+        }
         d->d_body->d_type = Thing::Body;
         foreach( SynTree* s, st->d_children )
+        {
             if( s->d_tok.d_type == SynTree::R_formal_parameter_list)
                 formal_parameter_list(d->d_body, s);
+            if( s->d_tok.d_type == SynTree::R_result_type && !s->d_children.isEmpty())
+                type_identifier(d->d_body, s->d_children.first());
+        }
         return d->d_body;
     }
+
     void formal_parameter_list(Scope* scope, SynTree* st)
     {
         foreach( SynTree* s, st->d_children )
@@ -573,9 +601,9 @@ private:
             if( s->d_tok.d_type == SynTree::R_parameter_declaration)
                 parameter_declaration(scope,s);
             if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                procedure_heading(scope,s);
+                func_proc_heading(scope,s, Thing::Proc);
             if( s->d_tok.d_type == SynTree::R_function_heading)
-                function_heading(scope,s);
+                func_proc_heading(scope,s,Thing::Func);
         }
     }
     void parameter_declaration(Scope* scope, SynTree* st)
@@ -593,6 +621,14 @@ private:
         Declaration* d = scope->findDecl(t.d_id);
         if( d )
         {
+            if( d_cf->d_type == Thing::Unit )
+            {
+                QHash<Declaration*,Declaration*>::const_iterator intf = d_toIntf.find(d);
+                if( intf != d_toIntf.end() )
+                {
+                    d = intf.value(); // attach all refs to the interface declaration (otherwise they are not visible)
+                }
+            }
             Symbol* sy = new Symbol();
             sy->d_decl = d;
             sy->d_loc = t.toLoc();
@@ -613,8 +649,9 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_function_heading)
-                scope = function_heading(scope,s); // overwrite the scope by
-            if( s->d_tok.d_type == SynTree::R_body_)
+            {
+                scope = func_proc_heading(scope,s,Thing::Func); // overwrite the scope by
+            }if( s->d_tok.d_type == SynTree::R_body_)
                 body_(scope,s);
         }
     }
@@ -627,19 +664,6 @@ private:
                 t = s->d_tok;
         }
         return t;
-    }
-    Scope* function_heading(Scope* scope, SynTree* st)
-    {
-        Token id = findIdent(st);
-        Declaration* d = addDecl(scope,id, Thing::Func);
-        d->d_body = new Scope();
-        d->d_body->d_owner = d;
-        d->d_body->d_outer = scope;
-        d->d_body->d_type = Thing::Body;
-        foreach( SynTree* s, st->d_children )
-            if( s->d_tok.d_type == SynTree::R_formal_parameter_list)
-                formal_parameter_list(d->d_body, s);
-        return d->d_body;
     }
     void body_(Scope* scope, SynTree* st)
     {
@@ -1313,6 +1337,14 @@ Declaration*Scope::findDecl(const char* id, bool withImports) const
     {
         if( d->d_id == id )
             return d;
+    }
+    if( d_altOuter )
+    {
+        foreach( Declaration* d, d_altOuter->d_order )
+        {
+            if( d->d_id == id )
+                return d;
+        }
     }
     if( d_outer )
         return d_outer->findDecl(id);

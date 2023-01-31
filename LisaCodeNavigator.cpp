@@ -185,14 +185,14 @@ public:
             QApplication::restoreOverrideCursor();
             d_link.clear();
             Q_ASSERT( d_goto );
-            setPosition( d_goto->d_decl->getLoc(), true, true );
+            setPosition( d_goto->d_decl->getLoc(), false, true );
         }else if( QApplication::keyboardModifiers() == Qt::ControlModifier )
         {
             Symbol* id = that()->d_mdl->findSymbolBySourcePos(
                         d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
             if( id && id->d_decl )
             {
-                setPosition( id->d_decl->getLoc(), true, true );
+                setPosition( id->d_decl->getLoc(), false, true );
             }
         }else
             updateExtraSelections();
@@ -781,7 +781,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.5.0");
+    a.setApplicationVersion("0.6.0");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

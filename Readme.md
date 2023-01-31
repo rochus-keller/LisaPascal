@@ -34,28 +34,28 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [ ] transpiler to Free Pascal for MC68000 code generation
 - [ ] run the code on a Lisa emulator
 
-#### Current Status on January 23, 2023
+#### Status on January 23, 2023
 
 The parser works in principle; 381 of the 614 Lisa Pascal file found in the source tree parse without an error; most of the other 233 Lisa Pascal files have the same parser error, which is caused because the files are either incomplete or there are alternative parts of the code in the same file. It turned out that the Lisa source code heavily depends on a preprocessor, which is controled by source code directives of the form {$directive arguments}. There is e.g a {$I filepath} directive to include other source files, or an {$IFC variable} directive to enable or mute sections of the file (like #ifdef/#endif in C). Without this preprocessor, which I have not implemented (yet), the mentioned syntax errors cannot be avoided. I e.g. had to add a "non_regular_unit" to the grammar to deal with the fact, that some files only include a part of a program or a unit, so the parser could handle these files; but this is only a provisional fix and to continue the project the implementation of the preprocessor is unavoidable.
 
-#### Current Status on January 26, 2023
+#### Status on January 26, 2023
 
 The source tree is converted to a virtual file system using the original file names, considering Pascal files only. All program and unit files
 of this file system are parsed and include directives are resolved. Of the 360 program or unit files (with includes) 199 parse without an error.
 The Lisa toolkit uses Clascal which is not yet supported and leads to parsing errors.
 
-#### Current Status on January 28, 2023
+#### Status on January 28, 2023
 
 Conditional compilation and the Clascal syntax are implemented and tested. The LISA_OS part of the tree (about 200 kSLOC) parses with no errors but four missing include files. The full source tree (about 400 kSLOC measured with my tools) has 12 missing include files and 7 syntax errors. The 400 kSLOC parse on my machine in less than 7 seconds.
 
 The CodeNavigator shows the overlay file system (i.e. the one assumed by the source files) with all programs and units; the files can be browsed in a syntax highlighted viewer; semantic navigation is pending.
 
-#### Current Status on January 29, 2023
+#### Status on January 29, 2023
 
 An AST (as far as required) is constructed from the syntax and symbols are resolved (including imported modules) for crossreferencing. Source code navigation works (e.g. press Ctrl key while moving the cursor over idents and click to navigate to declaration if an underline is visible), but not all idents are indexed yet.
 Symbol lookup is too slow in the current implementation; I will do it as I did in my Oberon+ IDE with pointer instead of string comparisons, which requires an extra copy of the ident in lower case; the analysis of the about 400 kSLOC currently requires 11 seconds (instead of 7) on my machine.
 
-#### Current Status on January 30, 2023
+#### Status on January 30, 2023
 
 After a lot of debugging and fixing source code navigation works as expected (besides some symbols not yet indexed), and also the "Used by" cross-reference list is implemented and can be used for navigation (double-click). Also navigation history is improved (ALT+Left, ALT+Right) und synced with the views. 
 The indexer now considers the full syntax, including modules and imports, but qualifiers are not yet resolved.
@@ -63,6 +63,8 @@ I also implemented internalized strings with comparisons by address instead of b
 There is now also a BUSY build file, see below how to use it.
 
 #### Precompiled versions
+
+There is currently only a precompiled version for Windows x86: http://software.rochus-keller.ch/LisaCodeNavigator_win32.zip
 
 [TBD]
 
