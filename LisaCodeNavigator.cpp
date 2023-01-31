@@ -109,11 +109,14 @@ public:
             d_hl->addBuiltIn(w);
         foreach( const QByteArray& w, s_keywords )
             d_hl->addKeyword(w);
-        QFont f; // TODO
-        f.setStyleHint( QFont::TypeWriter );
-        f.setFamily("Mono");
-        f.setPointSize(9);
-        setFont(f);
+
+        QFont monospace("Monospace",9);
+        if( !monospace.exactMatch() )
+        {
+            monospace = QFont("DejaVu Sans Mono",9);
+            monospace.setStyleName("Book");
+        }
+        setFont(monospace);
     }
 
     bool loadFile( const QString& path )
@@ -780,6 +783,13 @@ int main(int argc, char *argv[])
     a.setApplicationName("LisaCodeNavigator");
     a.setApplicationVersion("0.5.0");
     a.setStyle("Fusion");
+    QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
+#ifdef Q_OS_LINUX
+    QFontDatabase::addApplicationFont(":/fonts/NotoSans.ttf"); 
+    QFont af("Noto Sans",9);
+    a.setFont(af);
+#endif
+
 
     QString dirPath;
     const QStringList args = QCoreApplication::arguments();

@@ -19,10 +19,10 @@
 #include <QFile>
 #include <QtDebug>
 #include <QCryptographicHash>
-#include "PpLexer.h"
+#include "LisaPpLexer.h"
 #include "LisaParser.h"
 #include "Converter.h"
-#include "FileSystem.h"
+#include "LisaFileSystem.h"
 using namespace Lisa;
 
 static void dump(QTextStream& out, const SynTree* node, int level)
