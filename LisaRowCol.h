@@ -19,6 +19,7 @@
 */
 
 #include <QString>
+#include <QPair>
 
 namespace Lisa
 {
@@ -32,7 +33,12 @@ struct RowCol
     bool operator==(const RowCol& rhs) const {
         return d_row == rhs.d_row && d_col == rhs.d_col;
     }
+    bool operator<(const RowCol& rhs) const {
+        return packed() < rhs.packed();
+    }
 };
+typedef QPair<RowCol,RowCol> Range;
+typedef QList<Range> Ranges;
 struct FilePos
 {
     RowCol d_pos;

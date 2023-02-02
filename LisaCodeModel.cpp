@@ -30,7 +30,7 @@ class CodeModelVisitor
 {
     CodeModel* d_mdl;
     UnitFile* d_cf;
-    QHash<Declaration*,Declaration*> d_toIntf;
+    QHash<Declaration*,Declaration*> d_redirect;
     struct Deferred
     {
         Symbol* sym;
@@ -39,6 +39,7 @@ class CodeModelVisitor
         SynTree* typeIdent;
     };
     QList<Deferred> d_deferred;
+    QList<Declaration*> d_forwards;
 
 public:
     CodeModelVisitor(CodeModel* m):d_mdl(m) {}
@@ -187,9 +188,9 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_declaration)
-                procedure_declaration(scope,s);
+                func_proc_declaration(scope,s, Thing::Proc);
             if( s->d_tok.d_type == SynTree::R_function_declaration)
-                function_declaration(scope,s);
+                func_proc_declaration(scope,s, Thing::Func);
             if( s->d_tok.d_type == SynTree::R_method_block)
                 method_block(scope,s);
         }
@@ -265,8 +266,8 @@ private:
                 Declaration* d = scope->findDecl(t.d_id);
                 if( d && d_cf->d_kind == Thing::Unit )
                 {
-                    QHash<Declaration*,Declaration*>::const_iterator intf = d_toIntf.find(d);
-                    if( intf != d_toIntf.end() )
+                    QHash<Declaration*,Declaration*>::const_iterator intf = d_redirect.find(d);
+                    if( intf != d_redirect.end() )
                         d = intf.value(); // attach all refs to the interface declaration (otherwise they are not visible)
                 }
                 def.sym->d_decl = d;
@@ -278,22 +279,18 @@ private:
         }
         d_deferred.clear();
     }
-    Declaration* findInInterface(Scope* scope, const Token&t)
+    Declaration* findInForwards(Scope* scope, const Token&t)
     {
-        if( d_cf->d_intf && scope == d_cf->d_impl )
+        Declaration* res = 0;
+        foreach( Declaration* d, d_forwards )
         {
-            Declaration* res = 0;
-            foreach( Declaration* d, d_cf->d_intf->d_order )
+            if( d->d_id == t.d_id )
             {
-                if( d->d_id == t.d_id )
-                {
-                    res = d;
-                    break;
-                }
+                res = d;
+                break;
             }
-            return res;
         }
-        return 0;
+        return res;
     }
 
     Declaration* addDecl(Scope* scope, const Token& t, int type )
@@ -307,27 +304,32 @@ private:
         d->d_owner = scope;
         scope->d_order.append(d);
 
+        const bool isFuncProc = type == Thing::Proc || type == Thing::Func;
+
+        if( isFuncProc && d_cf->d_intf && scope == d_cf->d_intf )
+            d_forwards.append(d);
+
         // each decl is also a symbol
-        Declaration* intf = 0;
-        if( (type == Thing::Proc || type == Thing::Func) && ( intf = findInInterface(scope,t) ) )
+
+        Declaration* fwd = 0;
+
+        Symbol* sy = new Symbol();
+        sy->d_loc = t.toLoc();
+        d_cf->d_syms[t.d_sourcePath].append(sy);
+        d->d_me = sy;
+
+        if( isFuncProc && scope == d_cf->d_impl && ( fwd = findInForwards(scope,t) ) )
         {
             // add the present symbol which points to the interface twin
-            Symbol* sy = new Symbol();
-            sy->d_decl = intf;
-            sy->d_loc = t.toLoc();
-            d_cf->d_syms[t.d_sourcePath].append(sy);
-            intf->d_refs[t.d_sourcePath].append(sy);
-            d->d_me = sy;
+            sy->d_decl = fwd;
+            fwd->d_refs[t.d_sourcePath].append(sy);
 
-            d_toIntf[d] = intf;
+            d_redirect[d] = fwd;
+            fwd->d_impl = d;
         }else
         {
-            Symbol* sy = new Symbol();
             sy->d_decl = d;
-            sy->d_loc = t.toLoc();
-            d_cf->d_syms[t.d_sourcePath].append(sy);
             d->d_refs[t.d_sourcePath].append(sy);
-            d->d_me = sy;
         }
 
         return d;
@@ -647,22 +649,27 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_declaration)
-                procedure_declaration(scope,s);
+                func_proc_declaration(scope,s, Thing::Proc);
             if( s->d_tok.d_type == SynTree::R_function_declaration)
-                function_declaration(scope,s);
+                func_proc_declaration(scope,s, Thing::Func);
         }
     }
-    void procedure_declaration(Scope* scope, SynTree* st)
+    void func_proc_declaration(Scope* scope, SynTree* st, int kind)
     {
+        Declaration* d = 0;
+        bool forward = false;
         foreach( SynTree* s, st->d_children )
         {
-            if( s->d_tok.d_type == SynTree::R_procedure_heading)
-                scope = func_proc_heading(scope,s,Thing::Proc); // overwrite the scope for the body
-            if( s->d_tok.d_type == SynTree::R_body_)
-                body_(scope,s);
+            if( s->d_tok.d_type == SynTree::R_procedure_heading ||
+                    s->d_tok.d_type == SynTree::R_function_heading )
+                d = func_proc_heading(scope,s,kind); // overwrite the scope for the body
+            else if( s->d_tok.d_type == SynTree::R_body_)
+                forward = body_( d ? d->d_body : scope,s);
         }
+        if( forward && d )
+            d_forwards.append(d);
     }
-    Scope* func_proc_heading(Scope* scope, SynTree* st, int type)
+    Declaration* func_proc_heading(Scope* scope, SynTree* st, int type)
     {
         Token id = findIdent(st);
         Declaration* d = addDecl(scope,id, type);
@@ -686,7 +693,7 @@ private:
             if( s->d_tok.d_type == SynTree::R_result_type && !s->d_children.isEmpty())
                 d->d_type = createAlias( type_identifier(d->d_body, s->d_children.first()) );
         }
-        return d->d_body;
+        return d;
     }
 
     void formal_parameter_list(Scope* scope, SynTree* st)
@@ -736,8 +743,8 @@ private:
         {
             if( d && d_cf->d_kind == Thing::Unit )
             {
-                QHash<Declaration*,Declaration*>::const_iterator intf = d_toIntf.find(d);
-                if( intf != d_toIntf.end() )
+                QHash<Declaration*,Declaration*>::const_iterator intf = d_redirect.find(d);
+                if( intf != d_redirect.end() )
                 {
                     d = intf.value(); // attach all refs to the interface declaration (otherwise they are not visible)
                 }
@@ -760,17 +767,6 @@ private:
                 res = addSym(scope,s->d_tok);
         return res;
     }
-    void function_declaration(Scope* scope, SynTree* st)
-    {
-        foreach( SynTree* s, st->d_children )
-        {
-            if( s->d_tok.d_type == SynTree::R_function_heading)
-            {
-                scope = func_proc_heading(scope,s,Thing::Func); // overwrite the scope by
-            }if( s->d_tok.d_type == SynTree::R_body_)
-                body_(scope,s);
-        }
-    }
     Token findIdent(SynTree* st)
     {
         Token t;
@@ -781,8 +777,9 @@ private:
         }
         return t;
     }
-    void body_(Scope* scope, SynTree* st)
+    bool body_(Scope* scope, SynTree* st)
     {
+        bool forward = false;
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_block)
@@ -791,7 +788,10 @@ private:
                 statement_part(scope,s);
             if( s->d_tok.d_type == SynTree::R_constant)
                 constant(scope,s);
+            if( s->d_tok.d_type == Tok_forward )
+                forward = true;
         }
+        return forward;
     }
     void statement_part( Scope* scope, SynTree* st)
     {
@@ -1139,6 +1139,7 @@ bool CodeModel::load(const QString& rootDir)
     d_map1.clear();
     d_map2.clear();
     d_sloc = 0;
+    d_mutes.clear();
     d_fs->load(rootDir);
     QList<Slot*> fileSlots;
     fillFolders(&d_root,&d_fs->getRoot(), &d_top, fileSlots);
@@ -1207,6 +1208,11 @@ UnitFile*CodeModel::getUnitFile(const QString& path) const
         return uf;
     }
     return 0;
+}
+
+Ranges CodeModel::getMutes(const QString& path)
+{
+    return d_mutes.value(path);
 }
 
 QVariant CodeModel::data(const QModelIndex& index, int role) const
@@ -1364,6 +1370,8 @@ void CodeModel::parseAndResolve(UnitFile* unit)
         unit->d_includes.append(inc);
     }
     d_sloc += lex.getSloc();
+    for( QHash<QString,Ranges>::const_iterator i = lex.getMutes().begin(); i != lex.getMutes().end(); ++i )
+        d_mutes.insert(i.key(),i.value());
 
     CodeModelVisitor v(this);
     v.visit(unit,&p.d_root); // visit takes ~8% more time than just parsing

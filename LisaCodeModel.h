@@ -83,13 +83,14 @@ public:
     typedef QHash<QString,SymList> Refs;
     Refs d_refs; // file path -> Symbols in it
     Symbol* d_me; // this is the symbol by which the decl itself is represented in the file
+    Declaration* d_impl; // points to implementation if this is in an interface or a forward
 
     FilePos getLoc() const { return d_loc; }
     quint16 getLen() const { return d_name.size(); }
     QString getName() const;
 
     UnitFile* getUnitFile() const; // only for ownership, not for actual file position
-    Declaration():d_body(0),d_owner(0),d_me(0),d_id(0),d_type(0){}
+    Declaration():d_body(0),d_owner(0),d_me(0),d_id(0),d_type(0),d_impl(0){}
     ~Declaration();
 };
 
@@ -190,6 +191,7 @@ public:
     CodeFile* getCodeFile(const QString& path) const;
     UnitFile* getUnitFile(const QString& path) const;
     Scope* getGlobals() { return &d_globals; }
+    Ranges getMutes( const QString& path );
 
     // overrides
     int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
@@ -221,6 +223,7 @@ private:
     QHash<const FileSystem::File*,UnitFile*> d_map1;
     QHash<QString,CodeFile*> d_map2; // real path -> file
     quint32 d_sloc; // number of lines of code without empty or comment lines
+    QHash<QString,Ranges> d_mutes;
 };
 }
 

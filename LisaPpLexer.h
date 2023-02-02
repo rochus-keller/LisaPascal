@@ -40,7 +40,6 @@ public:
         quint16 d_len; // the len of the include directive
     };
 
-
     PpLexer(FileSystem*);
     ~PpLexer();
 
@@ -50,6 +49,7 @@ public:
     Token peekToken(quint8 lookAhead = 1);
     quint32 getSloc() const { return d_sloc; }
     const QList<Include>& getIncludes() const { return d_includes; }
+    const QHash<QString,Ranges>& getMutes() const { return d_mutes; }
 protected:
     Token nextTokenImp();
     static PpSym checkPp(QByteArray&);
@@ -95,8 +95,14 @@ protected:
         }
     }
 private:
+    struct Level
+    {
+        Lexer d_lex;
+        Ranges d_mutes;
+    };
+
     FileSystem* d_fs;
-    QList<Lexer> d_stack;
+    QList<Level> d_stack;
     QList<QIODevice*> d_files;
     QList<Token> d_buffer;
     QString d_err;
@@ -104,6 +110,8 @@ private:
     PpVars d_ppVars;
     QList<ppstatus> d_conditionStack;
     QList<Include> d_includes;
+    QHash<QString,Ranges> d_mutes;
+    RowCol d_startMute;
 };
 }
 

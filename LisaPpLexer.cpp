@@ -44,8 +44,8 @@ bool PpLexer::reset(const QString& filePath)
     const FileSystem::File* f = d_fs->findFile(filePath);
     if( f == 0 )
         return false;
-    d_stack.push_back(Lexer());
-    d_stack.back().setIgnoreComments(false);
+    d_stack.push_back(Level());
+    d_stack.back().d_lex.setIgnoreComments(false);
     QFile* file = new QFile(filePath);
     if( !file->open(QIODevice::ReadOnly) )
     {
@@ -53,7 +53,7 @@ bool PpLexer::reset(const QString& filePath)
         d_stack.pop_back();
         return false;
     }
-    d_stack.back().setStream(file,filePath);
+    d_stack.back().d_lex.setStream(file,filePath);
     return true;
 }
 
@@ -86,14 +86,16 @@ Token PpLexer::nextTokenImp()
 {
     if( d_stack.isEmpty() )
         return Token(Tok_Eof);
-    Token t = d_stack.back().nextToken();
+    Token t = d_stack.back().d_lex.nextToken();
     while( t.d_type == Tok_Comment || t.d_type == Tok_Eof )
     {
+        const bool statusBefore = ppthis().open;
         if( t.d_type == Tok_Eof )
         {
-            d_files.removeAll(d_stack.back().getDevice());
-            delete d_stack.back().getDevice();
-            d_sloc += d_stack.back().getSloc();
+            d_files.removeAll(d_stack.back().d_lex.getDevice());
+            delete d_stack.back().d_lex.getDevice();
+            d_sloc += d_stack.back().d_lex.getSloc();
+            d_mutes.insert(t.d_sourcePath, d_stack.back().d_mutes);
             d_stack.pop_back();
             if( d_stack.isEmpty() )
                 return Token(Tok_Eof);
@@ -120,16 +122,26 @@ Token PpLexer::nextTokenImp()
                 return err;
             }
         }
+        const bool statusAfter = ppthis().open;
+        if( statusBefore != statusAfter )
+        {
+            if( !ppthis().open )
+            {
+                d_startMute = t.toLoc();
+                d_startMute.d_col += t.d_val.size();
+            }else
+                d_stack.back().d_mutes.append(qMakePair(d_startMute,t.toLoc()));
+        }
         if( !ppthis().open )
         {
-            t = d_stack.back().peekToken();
+            t = d_stack.back().d_lex.peekToken();
             while( t.d_type != Tok_Comment && t.d_type != Tok_Eof )
             {
-                t = d_stack.back().nextToken();
-                t = d_stack.back().peekToken();
+                t = d_stack.back().d_lex.nextToken();
+                t = d_stack.back().d_lex.peekToken();
             }
         }
-        t = d_stack.back().nextToken();
+        t = d_stack.back().d_lex.nextToken();
     }
     return t;
 }
@@ -245,8 +257,8 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
         inc.d_sourcePath = t.d_sourcePath;
         inc.d_len = t.d_val.size();
         d_includes.append(inc);
-        d_stack.push_back(Lexer());
-        d_stack.back().setIgnoreComments(false);
+        d_stack.push_back(Level());
+        d_stack.back().d_lex.setIgnoreComments(false);
         QFile* file = new QFile(found->d_realPath);
         if( !file->open(QIODevice::ReadOnly) )
         {
@@ -256,7 +268,7 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
             return false;
         }
         //qDebug() << "including:" << path; // TEST
-        d_stack.back().setStream(file,found->d_realPath);
+        d_stack.back().d_lex.setStream(file,found->d_realPath);
     }
     return true;
 }

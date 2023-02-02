@@ -91,7 +91,7 @@ class CodeNavigator::Viewer : public QPlainTextEdit
 public:
     QString d_path;
     typedef QList<QTextEdit::ExtraSelection> ESL;
-    ESL d_link, d_nonTerms;
+    ESL d_link, d_nonTerms, d_mutes;
     CodeNavigator* d_that;
     Symbol* d_goto;
     Highlighter* d_hl;
@@ -134,6 +134,7 @@ public:
 #ifdef LISA_CHECK_COVERAGE
         testMarkAllNonTerm(); // TEST
 #endif
+        markMutes( that()->d_mdl->getMutes(path) );
         that()->syncModuleList();
         return true;
     }
@@ -187,15 +188,13 @@ public:
             QApplication::restoreOverrideCursor();
             d_link.clear();
             Q_ASSERT( d_goto );
-            setPosition( d_goto->d_decl->getLoc(), false, true );
+            setPosition( d_goto, false, true );
         }else if( QApplication::keyboardModifiers() == Qt::ControlModifier )
         {
             Symbol* id = that()->d_mdl->findSymbolBySourcePos(
                         d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
-            if( id && id->d_decl )
-            {
-                setPosition( id->d_decl->getLoc(), false, true );
-            }
+            if( id )
+                setPosition( id, false, true );
         }else
             updateExtraSelections();
     }
@@ -203,6 +202,8 @@ public:
     void updateExtraSelections()
     {
         ESL sum;
+
+        sum << d_mutes;
 
         QTextEdit::ExtraSelection line;
         line.format.setBackground(QColor(Qt::yellow).lighter(150));
@@ -218,6 +219,21 @@ public:
         setExtraSelections(sum);
     }
 
+    void setPosition(Symbol* sym, bool center, bool pushPosition )
+    {
+        if( sym == 0 || sym->d_decl == 0 )
+            return;
+        if( sym->d_decl->isDeclaration() )
+        {
+            // if we hit the decl and there is an impl, jump to impl, and vice versa
+            Declaration* d = static_cast<Declaration*>(sym->d_decl);
+            if( d->d_impl && sym->d_loc == d->d_loc.d_pos && d->d_loc.d_filePath == d_path )
+                setPosition(d->d_impl->getLoc(), center, pushPosition );
+            else
+                setPosition(d->getLoc(), center, pushPosition );
+        }else
+            setPosition(sym->d_decl->getLoc(), center, pushPosition );
+    }
     void setPosition(const FilePos& pos, bool center, bool pushPosition )
     {
         const int line = pos.d_pos.d_row - 1;
@@ -256,18 +272,6 @@ public:
             else
                 ensureCursorVisible();
             updateExtraSelections();
-        }
-    }
-
-    void markNonTermsFromCursor()
-    {
-        QTextCursor cur = textCursor();
-        Symbol* id = that()->d_mdl->findSymbolBySourcePos(d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
-        if( id && id->d_decl && id->d_decl->isDeclaration() )
-        {
-            Declaration* d = static_cast<Declaration*>(id->d_decl);
-            QList<Symbol*> syms = d->d_refs.value(d_path);
-            markNonTerms(syms);
         }
     }
 
@@ -330,6 +334,37 @@ public:
             sel.cursor = c;
 
             d_nonTerms << sel;
+        }
+        updateExtraSelections();
+    }
+
+    void markMutes( const Ranges& list )
+    {
+        d_mutes.clear();
+        QTextCharFormat format;
+        QColor clr(Qt::lightGray);
+        clr.setAlpha(100);
+        format.setBackground(clr);
+        format.setProperty(QTextFormat::FullWidthSelection, true);
+        foreach( const Range& r, list )
+        {
+            QTextCursor c( document()->findBlockByNumber( r.first.d_row - 1) );
+            c.setPosition( c.position() + r.first.d_col - 1 );
+
+            if( r.second.d_row == r.first.d_row )
+                c.setPosition( c.position() + (r.second.d_col - r.first.d_col), QTextCursor::KeepAnchor );
+            else if( r.second.d_row > r.first.d_row )
+            {
+                const int row = document()->findBlockByNumber( r.second.d_row - 1).position();
+                c.setPosition( row + r.second.d_col - 1, QTextCursor::KeepAnchor );
+            }else
+                continue;
+
+            QTextEdit::ExtraSelection sel;
+            sel.format = format;
+            sel.cursor = c;
+
+            d_mutes << sel;
         }
         updateExtraSelections();
     }
@@ -577,9 +612,12 @@ void CodeNavigator::fillUsedBy(Symbol* id, Declaration* nt)
         {
             Symbol* sym = list[j];
             QTreeWidgetItem* item = new QTreeWidgetItem(d_usedBy);
+            const bool isDecl = sym == nt->d_me;
+            const bool isImpl = nt->d_impl && nt->d_impl->d_loc.d_pos == sym->d_loc
+                    && nt->d_impl->d_loc.d_filePath == path;
             item->setText( 0, QString("%1 %2:%3%4").arg(fileName)
                         .arg(sym->d_loc.d_row).arg( sym->d_loc.d_col)
-                           .arg( sym == nt->d_me ? " decl" : "" ) );
+                           .arg( isDecl ? " decl" : ( isImpl ? " impl" : "" ) ) );
             if( id && sym->d_loc == id->d_loc && path == d_view->d_path )
             {
                 QFont f = item->font(0);
@@ -767,11 +805,8 @@ void CodeNavigator::onGotoDefinition()
     QTextCursor cur = d_view->textCursor();
     Symbol* id = d_mdl->findSymbolBySourcePos(
                 d_view->d_path,cur.blockNumber() + 1,cur.positionInBlock() + 1);
-    if( id && id->d_decl )
-    {
-        FilePos pos = id->d_decl->getLoc();
-        d_view->setPosition( pos, true, true );
-    }
+    if( id )
+        d_view->setPosition( id, true, true );
 }
 
 void CodeNavigator::onOpen()
@@ -799,7 +834,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.7.0");
+    a.setApplicationVersion("0.6.2");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX
