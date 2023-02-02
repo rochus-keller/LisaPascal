@@ -71,19 +71,19 @@ void messageHander(QtMsgType type, const QMessageLogContext& ctx, const QString&
     report(type,message);
 }
 
-static QList<QByteArray> s_builtIns = QList<QByteArray>() << "ABS" << "ARCTAN" << "CHR" << "DISPOSE" << "EOF"
+static QSet<QString> s_builtIns = QSet<QString>() << "ABS" << "ARCTAN" << "CHR" << "DISPOSE" << "EOF"
                                                           << "EOLN" << "EXP" << "GET" << "LN" << "NEW" << "ODD"
                                                           << "ORD" << "PACK" << "PAGE" << "PRED" << "PUT" << "READ"
                                                           << "READLN" << "RESET" << "REWRITE" << "ROUND" << "SIN"
                                                           << "SQR" << "SQRT" << "SUCC" << "TRUNC" << "UNPACK"
                                                           << "WRITE" << "WRITELN"
                                                           << "REAL" << "INTEGER" << "LONGINT" << "BOOLEAN"
-                                                          << "STRING" << "EXIT" << "TRUE" << "FALSE"
+                                                          << "STRING" << "EXIT" << "TRUE" << "FALSE" << "CHAR"
                                                           << "MARK" << "RELEASE" << "ORD4" << "POINTER"
                                                           << "PWROFTEN" << "LENGTH" << "POS" << "CONCAT"
                                                           << "COPY" << "DELETE" << "INSERT" << "MOVELEFT"
                                                           << "MOVERIGHT" << "SIZEOF" << "SCANEQ" << "SCANNE"
-                                                          << "FILLCHAR";
+                                                          << "FILLCHAR" << "COS" << "HALT";
 static QList<QByteArray> s_keywords = QList<QByteArray>() << "ABSTRACT" << "CLASSWIDE" << "OVERRIDE" << "DEFAULT";
 
 class CodeNavigator::Viewer : public QPlainTextEdit
@@ -105,8 +105,8 @@ public:
         setTabChangesFocus(true);
         setMouseTracking(true);
         d_hl = new Highlighter( document() );
-        foreach( const QByteArray& w, s_builtIns )
-            d_hl->addBuiltIn(w);
+        foreach( const QString& w, s_builtIns )
+            d_hl->addBuiltIn(w.toUtf8());
         foreach( const QByteArray& w, s_keywords )
             d_hl->addKeyword(w);
 
@@ -131,7 +131,9 @@ public:
         QByteArray buf = in.readAll();
         buf.chop(1);
         setPlainText( QString::fromLatin1(buf) );
-        // testMarkAllNonTerm(); // TEST
+#ifdef LISA_CHECK_COVERAGE
+        testMarkAllNonTerm(); // TEST
+#endif
         that()->syncModuleList();
         return true;
     }
@@ -274,7 +276,7 @@ public:
         // TEST
         d_nonTerms.clear();
         QTextCharFormat missing;
-        missing.setBackground( Qt::red );
+        missing.setBackground( QColor(Qt::red).lighter(170));
         QTextCharFormat underline;
         underline.setFontUnderline(true);
         underline.setUnderlineColor(Qt::magenta);
@@ -285,10 +287,21 @@ public:
         const UnitFile::SymList& syms = uf->d_syms.value(d_path);
         foreach( const Symbol* n, syms )
         {
+#if 1
+            if( n->d_decl != 0 )
+                continue;
+#endif
             RowCol loc = n->d_loc;
             QTextCursor c( document()->findBlockByNumber( loc.d_row - 1) );
             c.setPosition( c.position() + loc.d_col - 1 );
-            c.setPosition( c.position() + ( n->d_decl ?  n->d_decl->getLen() : 1 ), QTextCursor::KeepAnchor );
+            if( n->d_decl )
+                c.setPosition( c.position() + n->d_decl->getLen(), QTextCursor::KeepAnchor );
+            else
+            {
+                c.movePosition(QTextCursor::EndOfWord,QTextCursor::KeepAnchor);
+                if( s_builtIns.contains(c.selectedText().toUpper()) )
+                    continue;
+            }
 
             QTextEdit::ExtraSelection sel;
             sel.format = n->d_decl ? underline : missing;
@@ -422,6 +435,11 @@ CodeNavigator::CodeNavigator(QWidget *parent) : QMainWindow(parent),d_pushBackLo
     logMessage(tr("ALT+LEFT to move backwards in the navigation history") );
     logMessage(tr("ALT+RIGHT to move forward in the navigation history") );
     logMessage(tr("ESC to close Message Log") );
+}
+
+CodeNavigator::~CodeNavigator()
+{
+    s_this = 0;
 }
 
 void CodeNavigator::open(const QString& sourceTreePath)
@@ -651,11 +669,11 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     if( nt == 0 )
         return;
 
-    if( nt->d_type == Thing::Unit )
+    if( nt->d_kind == Thing::Unit )
     {
         const UnitFile* f = static_cast<const UnitFile*>(nt);
         d_view->loadFile(f->d_file->d_realPath);
-    }else if( nt->d_type == Thing::Include )
+    }else if( nt->d_kind == Thing::Include )
     {
         const IncludeFile* f = static_cast<const IncludeFile*>(nt);
         d_view->loadFile(f->d_file->d_realPath);
@@ -781,7 +799,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.6.0");
+    a.setApplicationVersion("0.7.0");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX
@@ -810,10 +828,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    CodeNavigator w;
-    w.showMaximized();
+    CodeNavigator* w = new CodeNavigator();
+    w->showMaximized();
     if( !dirPath.isEmpty() )
-        w.open(dirPath);
+        w->open(dirPath);
 
-    return a.exec();
+    const int res = a.exec();
+    delete w;
+
+    return res;
 }

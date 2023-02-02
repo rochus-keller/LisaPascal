@@ -41,6 +41,8 @@ class CodeNavigator : public QMainWindow
     Q_OBJECT
 public:
     explicit CodeNavigator(QWidget *parent = 0);
+    ~CodeNavigator();
+
     void open( const QString& sourceTreePath);
     void logMessage(const QString&);
 

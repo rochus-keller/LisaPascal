@@ -5,6 +5,7 @@ TEMPLATE = app
 
 INCLUDEPATH +=  ..
 
+#DEFINES += LISA_CHECK_COVERAGE
 
 CONFIG(debug, debug|release) {
         DEFINES += _DEBUG

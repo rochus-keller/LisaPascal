@@ -23,6 +23,7 @@
 #include <QAbstractItemModel>
 #include <QHash>
 #include <LisaFileSystem.h>
+#include <QSharedData>
 #include "LisaRowCol.h"
 
 namespace Lisa
@@ -34,30 +35,44 @@ class Symbol;
 class Thing
 {
 public:
-    enum Type { Undefined,
-       /* Declaration: */ Const, Type, Var, Func, Proc, Param, Label, Field, Module,
-       /* Scope: */ Interface, Implementation, Body,
+    enum Kind { Undefined,
+       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, Param, Label, Field, Module,
+       /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
        /* IncludeFile: */ Include,
        /* CodeFolder: */ Folder
     };
-    quint8 d_type;
-    bool d_external; // Fund & Proc decls
+    quint8 d_kind;
 
     virtual FilePos getLoc() const { return FilePos(); }
     virtual quint16 getLen() const { return 0; }
     virtual QString getName() const;
     virtual const FileSystem::File* getFile() const { return 0; }
-    bool isDeclaration() const { return d_type >= Const && d_type <= Module; }
+    bool isDeclaration() const { return d_kind >= Const && d_kind <= Module; }
     const char* typeName() const;
-    Thing():d_type(Undefined),d_external(false){}
+    Thing():d_kind(Undefined){}
     virtual ~Thing();
+};
+
+class Type : public QSharedData
+{
+public:
+    typedef QExplicitlySharedDataPointer<Type> Ref;
+    enum Kind { Undefined, Pointer, Array, Record, Class
+              };
+    Type::Ref d_type;
+    Scope* d_members; // owns
+    quint8 d_kind;
+
+    Type():d_type(0), d_members(0),d_kind(Undefined) {}
+    ~Type();
 };
 
 class Declaration : public Thing
 {
 public:
     Scope* d_body; // owns
+    Type::Ref d_type;
     QByteArray d_name;
     const char* d_id; // same as in Token
 
@@ -74,7 +89,7 @@ public:
     QString getName() const;
 
     UnitFile* getUnitFile() const; // only for ownership, not for actual file position
-    Declaration():d_body(0),d_owner(0),d_me(0),d_id(0){}
+    Declaration():d_body(0),d_owner(0),d_me(0),d_id(0),d_type(0){}
     ~Declaration();
 };
 
@@ -82,7 +97,7 @@ class Scope : public Thing
 {
 public:
     QList<Declaration*> d_order; // owns
-    Thing* d_owner; // either declaration or unit file
+    Thing* d_owner; // either declaration or unit file or 0
     Scope* d_outer;
     Scope* d_altOuter; // to access params defined in interface declaration of func/proc
 
@@ -126,7 +141,7 @@ public:
     FilePos getLoc() const; // the landing place when we jump to this file
     quint16 getLen() const { return d_len; }
     QString getName() const;
-    IncludeFile():d_unit(0),d_len(0){ d_type = Include; }
+    IncludeFile():d_unit(0),d_len(0){ d_kind = Include; }
 };
 
 class UnitFile : public CodeFile
@@ -142,7 +157,7 @@ public:
 
     QString getName() const;
     QByteArrayList findUses() const;
-    UnitFile():d_intf(0),d_impl(0),d_globals(0) { d_type = Unit; }
+    UnitFile():d_intf(0),d_impl(0),d_globals(0) { d_kind = Unit; }
     ~UnitFile();
 };
 
@@ -155,7 +170,7 @@ public:
 
     QString getName() const;
     void clear();
-    CodeFolder():d_dir(0){ d_type = Folder; }
+    CodeFolder():d_dir(0){ d_kind = Folder; }
     ~CodeFolder() { clear(); }
 };
 
@@ -164,6 +179,7 @@ class CodeModel : public QAbstractItemModel
     Q_OBJECT
 public:
     explicit CodeModel(QObject *parent = 0);
+    ~CodeModel();
 
     bool load( const QString& rootDir );
     const Thing* getThing(const QModelIndex& index) const;

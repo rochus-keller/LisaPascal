@@ -23,7 +23,7 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] Highlighted code browser
 - [x] Mark symbols and navigate from symbols do declarations across all files
 - [x] BUSY & LeanQt build
-- [ ] resolve qualifiers by type for navigation of record fields
+- [x] resolve qualifiers by type for navigation of record fields
 - [ ] Module detail outline view
 - [ ] Class hierarchy outline view
 - [ ] precompiled binary versions for all platforms
