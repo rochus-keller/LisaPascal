@@ -110,12 +110,15 @@ public:
         foreach( const QByteArray& w, s_keywords )
             d_hl->addKeyword(w);
 
-        QFont monospace("Monospace",9);
+#if defined(Q_OS_WIN32)
+        QFont monospace("Consolas");
+#elif defined(Q_OS_MAC)
+        QFont monospace("SF Mono");
+#else
+        QFont monospace("Monospace");
+#endif
         if( !monospace.exactMatch() )
-        {
-            monospace = QFont("DejaVu Sans Mono",9);
-            monospace.setStyleName("Book");
-        }
+            monospace = QFont("DejaVu Sans Mono");
         setFont(monospace);
     }
 
@@ -452,6 +455,8 @@ CodeNavigator::CodeNavigator(QWidget *parent) : QMainWindow(parent),d_pushBackLo
     new QShortcut(tr("F3"),this,SLOT(onFindAgain()) );
     new QShortcut(tr("F2"),this,SLOT(onGotoDefinition()) );
     new QShortcut(tr("CTRL+O"),this,SLOT(onOpen()) );
+    new QShortcut(Qt::CTRL + Qt::Key_Plus,this,SLOT(onIncreaseSize()) );
+    new QShortcut(Qt::CTRL + Qt::Key_Minus,this,SLOT(onDecreaseSize()) );
 
     s_this = this;
     s_oldHandler = qInstallMessageHandler(messageHander);
@@ -469,6 +474,8 @@ CodeNavigator::CodeNavigator(QWidget *parent) : QMainWindow(parent),d_pushBackLo
     logMessage(tr("CTRL+G or F3 to find another match in the current file") );
     logMessage(tr("ALT+LEFT to move backwards in the navigation history") );
     logMessage(tr("ALT+RIGHT to move forward in the navigation history") );
+    logMessage(tr("CTRL+PLUS increase browser font size") );
+    logMessage(tr("CTRL+MINUS decrease browser font size") );
     logMessage(tr("ESC to close Message Log") );
 }
 
@@ -827,6 +834,20 @@ void CodeNavigator::onRunReload()
     qDebug() << "parsed" << d_mdl->getSloc() << "SLOC in" << t.elapsed() << "[ms]";
 }
 
+void CodeNavigator::onIncreaseSize()
+{
+    QFont f = d_view->font();
+    f.setPointSize(f.pointSize()+1);
+    d_view->setFont(f);
+}
+
+void CodeNavigator::onDecreaseSize()
+{
+    QFont f = d_view->font();
+    f.setPointSize(qMax(f.pointSize()-1,3));
+    d_view->setFont(f);
+}
+
 
 int main(int argc, char *argv[])
 {
@@ -834,7 +855,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.6.2");
+    a.setApplicationVersion("0.6.3");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

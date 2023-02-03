@@ -11,7 +11,7 @@ Cloc (http://cloc.sourceforge.net) counts 456 kSLOC, of which 408 kSLOC are Pasc
 #### Lisa Code Navigator
 
 [TBD]
-![LisaCodeNavigator Screenshot](http://software.rochus-keller.ch/lisacodenavigator-0.4-screenshot.png)
+![LisaCodeNavigator Screenshot](http://software.rochus-keller.ch/lisacodenavigator-0.6.3-screenshot.png)
 
 #### Planned features
 
@@ -24,13 +24,13 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] Mark symbols and navigate from symbols do declarations across all files
 - [x] BUSY & LeanQt build
 - [x] resolve qualifiers by type for navigation of record fields
+- [x] precompiled binary versions for main platforms
 - [ ] Module detail outline view
-- [ ] Class hierarchy outline view
-- [ ] precompiled binary versions for all platforms
 - [ ] MC68000 assembler integrated with code model and symbol navigation
 
 #### Features in evaluation
 
+- [ ] Class hierarchy outline view
 - [ ] transpiler to Free Pascal for MC68000 code generation
 - [ ] run the code on a Lisa emulator
 
@@ -64,9 +64,12 @@ There is now also a BUSY build file, see below how to use it.
 
 #### Precompiled versions
 
-There is currently only a precompiled version for Windows x86: http://software.rochus-keller.ch/LisaCodeNavigator_win32.zip
+The following precompiled versions are available at this time:
 
-[TBD]
+- [Windows x86](http://software.rochus-keller.ch/LisaCodeNavigator_win32.zip)
+- [Linux x86_64](http://software.rochus-keller.ch/LisaCodeNavigator_linux64.tar.gz)
+- [Mac x86_64](http://software.rochus-keller.ch/LisaCodeNavigator_mac64.zip)
+
 
 #### How to build the parser and code navigator
 

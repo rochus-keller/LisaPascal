@@ -82,6 +82,8 @@ protected slots:
     void onGotoDefinition();
     void onOpen();
     void onRunReload();
+    void onIncreaseSize();
+    void onDecreaseSize();
 
 private:
     class Viewer;
