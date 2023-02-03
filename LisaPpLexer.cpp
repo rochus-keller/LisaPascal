@@ -245,18 +245,15 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
         found = d_fs->findFile(f->d_dir, QString(), name);
     }else if( pathFile.size() == 2 )
         found = d_fs->findFile(f->d_dir, pathFile[0], pathFile[1]);
-    if( found == 0 )
+
+    Include inc;
+    inc.d_inc = found;
+    inc.d_loc = t.toLoc();
+    inc.d_sourcePath = t.d_sourcePath;
+    inc.d_len = t.d_val.size();
+    d_includes.append(inc);
+    if( found )
     {
-        d_err = QString("include file '%1' not found").arg(data.constData()).toUtf8();
-        return false;
-    }else
-    {
-        Include inc;
-        inc.d_inc = found;
-        inc.d_loc = t.toLoc();
-        inc.d_sourcePath = t.d_sourcePath;
-        inc.d_len = t.d_val.size();
-        d_includes.append(inc);
         d_stack.push_back(Level());
         d_stack.back().d_lex.setIgnoreComments(false);
         QFile* file = new QFile(found->d_realPath);
@@ -267,10 +264,10 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
             d_err = QString("file '%1' cannot be opened").arg(data.constData()).toUtf8();
             return false;
         }
-        //qDebug() << "including:" << path; // TEST
         d_stack.back().d_lex.setStream(file,found->d_realPath);
-    }
-    return true;
+    }else
+        d_err = QString("include file '%1' not found").arg(data.constData()).toUtf8();
+    return found;
 }
 
 class PpEval

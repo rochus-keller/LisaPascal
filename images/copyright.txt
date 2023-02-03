@@ -1,0 +1,563 @@
+This application makes use of some icons of the Lazarus IDE.
+The following terms apply:
+
+LICENSE AND COPYRIGHT INFORMATION ABOUT IMAGES USED IN LAZARUS IDE
+------------------------------------------------------------------
+
+Public domain Tango https://packages.debian.org/sid/tango-icon-theme
+- ToDo
+
+Creative Commons. Author and source mentioned.
+- pkg_sortalphabetically.png, originally sort_ascend.png by Momenticons (got from findicons.com)
+
+---
+
+Following images were created by FTurtle (this holds also for the equally named
+files with appendix _150 and _200):
+
+actions directory:
+	arrow__darkgreen_down.png
+	arrow__darkgreen_left.png
+	arrow__darkgreen_right.png
+	arrow__darkgreen_up.png
+	arrow__darkred_down.png
+	arrow__darkred_left.png
+	arrow__darkred_right.png
+	arrow__darkred_up.png
+	autocomplete.png
+	filter_any_place.png    (used 'item_filter.png' created by Roland Hahn)
+	filter_from_begin.png    (used 'item_filter.png' created by Roland Hahn)
+	laz_open.png
+	laz_open_recent.png
+	laz_open_unit.png
+	laz_save.png
+	next_word.png
+	pastel_colors.png
+	previous_word.png
+	restore_default.png
+	restore_defaults.png
+	tab_close_All.png
+	tab_close_L.png
+	tab_close_LR.png
+	tab_close_R.png
+
+debugger directory:
+	debugger_call_stack.png
+
+designer directory:
+	anchor_bottom_bottom.png
+	anchor_bottom_center.png
+	anchor_bottom_top.png
+	anchor_left_center.png
+	anchor_left_left.png
+	anchor_left_right.png
+	anchor_right_center.png
+	anchor_right_left.png
+	anchor_right_right.png
+	anchor_top_bottom.png
+	anchor_top_center.png
+	anchor_top_top.png
+	tab_order.png
+
+items directory:
+	datamodule_designer.png    (used 'tdatasource.png' created by Roland Hahn)
+	form_designer.png
+	frame_designer.png
+	item_form.png
+	item_project.png
+	item_project_source.png
+	item_unit.png
+
+menu directory:
+	menu_add_jump_point_to_history.png
+	menu_clear_all_bookmarks.png
+	menu_clear_file_bookmarks.png
+	menu_close.png
+	menu_close_all.png
+	menu_file_revert.png
+	menu_goto_bookmark0.png
+	menu_goto_bookmark1.png
+	menu_goto_bookmark2.png
+	menu_goto_bookmark3.png
+	menu_goto_bookmark4.png
+	menu_goto_bookmark5.png
+	menu_goto_bookmark6.png
+	menu_goto_bookmark7.png
+	menu_goto_bookmark8.png
+	menu_goto_bookmark9.png
+	menu_goto_bookmarks.png
+	menu_goto_line.png
+	menu_indent.png
+	menu_jumpto_implementation.png
+	menu_jumpto_implementationuses.png
+	menu_jumpto_initialization.png
+	menu_jumpto_interface.png
+	menu_jumpto_interfaceuses.png
+	menu_jumpto_section.png
+	menu_manage_desktops.png
+	menu_manage_source_editors.png
+	menu_new.png
+	menu_new_form.png
+	menu_new_search.png
+	menu_new_unit.png
+	menu_project_add.png
+	menu_project_close.png
+	menu_project_from_file.png
+	menu_project_inspector.png
+	menu_project_new.png
+	menu_project_open.png
+	menu_project_open_recent.png
+	menu_project_options.png
+	menu_project_remove.png
+	menu_project_save.png
+	menu_project_save_as.png
+	menu_redo.png
+	menu_saveas.png
+	menu_save_all.png
+	menu_search_files.png
+	menu_search_find.png
+	menu_search_find_next.png
+	menu_search_find_previous.png
+	menu_search_incremental.png
+	menu_search_jumpback.png
+	menu_search_jumpforward.png
+	menu_search_next_bookmark.png
+	menu_search_next_error.png    (used 'state_error.png' created by Roland Hahn)
+	menu_search_openfile_atcursor.png
+	menu_search_previous_bookmark.png
+	menu_search_previous_error.png    (used 'state_error.png' created by Roland Hahn)
+	menu_search_procedure_list.png    (used 'cc_procedure.png' created by Roland Hahn)
+	menu_search_replace.png
+	menu_search_set_bookmark.png
+	menu_set_free_bookmark.png
+	menu_stepinto.png
+	menu_stepout.png
+	menu_stepover.png
+	menu_toggle_bookmark0.png
+	menu_toggle_bookmark1.png
+	menu_toggle_bookmark2.png
+	menu_toggle_bookmark3.png
+	menu_toggle_bookmark4.png
+	menu_toggle_bookmark5.png
+	menu_toggle_bookmark6.png
+	menu_toggle_bookmark7.png
+	menu_toggle_bookmark8.png
+	menu_toggle_bookmark9.png
+	menu_toggle_bookmarks.png
+	menu_tool_check_lfm.png
+	menu_tool_syntax_check.png
+	menu_undo.png
+	menu_unindent.png
+	menu_view_anchor_editor.png
+	menu_view_code_browser.png
+	menu_view_code_explorer.png
+	menu_view_components.png
+	menu_view_forms.png
+	menu_view_inspector.png
+	menu_view_jump_history.png
+	menu_view_messages.png
+	menu_view_restriction_browser.png
+	menu_view_search_results.png
+	menu_view_source_editor.png
+	menu_view_toggle_form_unit.png
+	menu_view_units.png
+	menu_view_unit_info.png
+
+sourceeditor directory:
+	bookmark0.png
+	bookmark1.png
+	bookmark2.png
+	bookmark3.png
+	bookmark4.png
+	bookmark5.png
+	bookmark6.png
+	bookmark7.png
+	bookmark8.png
+	bookmark9.png
+
+states directory:
+	state_warning.png
+	state_warning_69.png
+	state_warning_75.png
+	state_warning_150.png
+	state_warning_200.png
+
+packages directory
+	pkg_open_recent.png    (used 'pkg_open.png' created by Roland Hahn)
+
+--------------------------------------------------------------------------------
+
+The following component palette and menu/toolbar icons (including equally named
+files with appendix _150 and _200) were created by Roland Hahn (no restrictions). 
+svg sources can be found on Lazarus Components and Code Repository, 
+folder image_sources.
+
+actions folder:
+	execute.png
+	laz_cancel.png
+	laz_edit.png
+	laz_export.png
+	laz_highlighter.png
+	laz_refresh.png
+	laz_tick.png
+	laz_wand.png
+	preferences.png
+	
+codeexplorer folder:
+	ce_classinterface.png
+	ce_cycleimplementation.png
+	ce_cycleinterface.png
+	ce_default.png
+	ce_deprecated.png
+	ce_experimental.png
+	ce_finalization.png
+	ce_helper.png
+	ce_implementation.png
+	ce_initialization.png
+	ce_interface.png
+	ce_library.png
+	ce_platform.png
+	ce_program.png
+	ce_property_readonly.png
+	ce_section.png
+	ce_unimplemented.png
+	show_category.png
+	show_source.png
+	
+codetoolsdefines folder:
+	da_block.png
+	da_define.png
+	da_definerecurse.png
+	da_define.png
+	da_directory.png
+	da_else.png
+	da_elseif.png
+	da_if.png
+	da_ifdef.png
+	da_ifndef.png
+	da_undefine.png
+	da_undefineall.png
+	da_undefinerecurse.png
+	
+components folder:
+	default.png
+	tactionlist.png
+	tapplicationproperties.png
+	tarrow.png
+	tasyncprocess.png
+	tbevel.png
+	tbitbtn.png
+	tbufdataset.png
+	tbutton.png
+	tbuttonpanel.png
+	tcalcedit.png
+	tcalculatordialog.png
+	tcalendar.png
+	tcalendardialog.png
+	tcheckbox.png
+	tcheckcombobox.png
+	tcheckgroup.png
+	tchecklistbox.png
+	tcolorbox.png
+	tcolorbutton.png
+	tcolordialog.png
+	tcolorlistbox.png
+	tcombobox.png
+	tcomboboxex.png
+	tcontrolbar.png
+	tcoolbar.png
+	tdatasource.png
+	tdateedit.png
+	tdbcalendar.png
+	tdbcheckbox.png
+	tdbcombobox.png
+	tdbdateedit.png
+	tdbedit.png
+	tdbgrid.png
+	tdbgroupbox.png
+	tdbimage.png
+	tdblistbox.png
+	tdblookupcombobox.png
+	tdblookuplistbox.png
+	tdbmemo.png
+	tdbnavigator.png
+	tdbradiogroup.png
+	tdbtext.png
+	tdirectoryedit.png
+	tdrawgrid.png
+	tedit.png
+	teditbutton.png
+	teventlog.png
+	tfilelistbox.png
+	tfilenameedit.png
+	tfiltercombobox.png
+	tfinddialog.png
+	tfloatspinedit.png
+	tflowpanel.png
+	tfontdialog.png
+	tframe.png
+	tgroupbox.png
+	theadercontrol.png
+	thtmlbrowserhelpviewer.png
+	thtmlhelpdatabase.png
+	tidedialoglayoutstorage.png
+	tidletimer.png
+	timage.png
+	timagelist.png
+	tinipropstorage.png
+	tjsonpropstorage.png
+	tlabel.png
+	tlabelededit.png
+	tlazcomponentqueue.png
+	tlistbox.png
+	tlistview.png
+	tmainmenu.png
+	tmaskedit.png
+	tmemo.png
+	tmouse.png
+	tnotebook.png
+	topendialog.png
+	topenpicturedialog.png
+	tpagecontrol.png
+	tpaintbox.png
+	tpairsplitter.png
+	tpanel.png
+	tpicture.png
+	tpopupmenu.png
+	tpopupnotifier.png
+	tprocess.png
+	tprocessutf8.png
+	tprogressbar.png
+	tradiobutton.png
+	tradiogroup.png
+	treplacedialog.png
+	tsavedialog.png
+	tsavepicturedialog.png
+	tscrollbar.png
+	tscrollbox.png
+	tselectdirectorydialog.png
+	tservicemanager.png
+	tshape.png
+	tshelllistview.png
+	tshelltreeview.png
+	tsimpleipcclient.png
+	tsimpleipcserver.png
+	tspeedbutton.png
+	tspinedit.png
+	tsplitter.png
+	tstatictext.png
+	tstatusbar.png
+	tstringgrid.png
+	ttabcontrol.png
+	ttaskdialog.png
+	ttimeedit.png
+	ttimer.png
+	ttogglebox.png
+	ttoolbar.png
+	ttrackbar.png
+	ttrayicon.png
+	ttreeview.png
+	tupdown.png
+	tvaluelisteditor.png
+	txmlconfig.png
+	txmlpropstorage.png
+	unregisteredcomponent.png
+	
+componenttreeview directory
+	oi_box.png
+	oi_collection.png
+	oi_comp.png
+	oi_control.png
+	oi_form.png
+	oi_item.pnt
+	
+debugger directory
+	callstack_bottom.png
+	callstack_goto.png
+	callstack_more.png
+	callstack_show.png
+	callstack_top.png
+	camera.png
+	camera_add.png
+	camera_go.png
+	clock.png
+	debugger.png
+	debugger_breakpoints.png
+	debugger_disable.png
+	debugger_disable_all.png
+	debugger_enable.png
+	debugger_enable_all.png
+	debugger_evaluate.png
+	debugger_event_log.png
+	debugger_inspect.png
+	debugger_modify.png
+	debugger_options.png
+	debugger_output.png
+	debugger_power.png
+	debugger_power_grey.png
+	debugger_show_execution_point.png
+	debugger_watches.png
+	evaluate_no_hist.png
+	evaluate_up.png
+
+designer directory
+	align.png
+	mirror_horizontal.png
+	mirror_vertical.png
+	order_back_one.png
+	order_forward_one.png
+	order_move_back.png
+	order_move_front.png
+	scale.png
+	size.png
+	
+items directory
+	item_character.png
+	item_filter.png
+	item_font.png
+	item_keyboard.png
+	item_library.png
+	item_package.png
+	item_todo.png
+
+lazdoc directory
+	formatbold.png
+	formatitalic.png
+	formatunderline.png
+	insertcodetag.png
+	insertremark.png
+	insertvartag.png
+	
+menu directory
+	menu_abort_build.png
+	menu_build.png
+	menu_build_all.png
+	menu_build_clean.png
+	menu_build_file.png
+	menu_build_lazarus.png
+	menu_build_run_file.png
+	menu_clean.png
+	menu_codetoolsdefineseditor.png
+	menu_codetoolsoptions.png
+	menu_comment.png
+	menu_compiler_options.png
+	menu_configure_build_lazarus.png
+	menu_configure_help.png
+	menu_editor_options.png
+	menu_edit_lowercase.png
+	menu_edit_sort.png
+	menu_edit_uppercase.png
+	menu_environment_options.png
+	menu_exit.png
+	menu_file_print.png
+	menu_information.png
+	menu_jumpto_procedurebegin.png
+	menu_jumptoprocedureheader.png
+	menu_pause.png
+	menu_quick_compile.png
+	menu_reportingbug.png
+	menu_reset_debugger.png
+	menu_run_file.png
+	menu_run_cursor.png
+	menu_run_file.png
+	menu_run_parameters.png
+	menu_run_withoutdebuggin.png
+	menu_search_set_bookmark.png
+	menu_select_all.png
+	menu_stepinto_instr.png
+	menu_stepinto_instr_run_file.png
+	menu_stepover:instr.png
+	menu_stop.png
+	menu_tool_del_to_laz.png
+	menu_tool_del_to_laz_form.png
+	menu_tool_del_to_laz_pkg.png
+	menu_tool_del_to_laz_project.png
+	menu_tool_del_to_laz_unit.png
+	menu_tool_diff.png
+	menu_tool_make_resourcestring.png
+	menu_uncomment.png
+	menu_view_todo.png
+	SelCompPage.png
+
+packages directory
+	pkg_add.png
+	pkg_binary.png
+	pkg_compile.png
+	pkg_conflict.png
+	pkg_core_overlay.png
+	pkg_design_overlay.png
+	pkg_files.png
+	pkg_fpc_overlay.png
+	pkg_graph.png
+	pkg_hierarchical.png
+	pkg_include.png
+	pkg_inherited.png
+	pkg_install.png
+	pkg_installed.png
+	pkg_issues.png
+	pkg_lazarus_overlay.png
+	pkg_lfm.png
+	pkg_lrs.png
+	pkg_open.png
+	pkg_package_autoinstall.png
+	pkg_package_circle.png
+	pkg_package_uninstall.png
+	pkg_properties.png
+	pkg_registerunit.png
+	pkg_removedfiles.png
+	pkg_removedrequired.png
+	pkg_required.png
+	pkg_runtime_overlay.png
+	pkg_sortalphabetically.png
+	pkg_text.png
+	pkg_unit.png
+	
+states directory (also variants with appendix _69 and _75)
+	quickfix
+	state_circular_reference
+	state_error
+	state_fatal
+	state_hint
+	state_information
+	state_note
+	state_not_found
+	state_unit_circular_reference
+	state_unknown
+	state_warning
+
+windows directory
+  win_formeditor.ico
+  win_main.ico 
+  win_message.ico
+  win_objectinspector.ico
+  win_sourceditor.ico
+
+images root folder
+  folder.png
+  includefile.ico
+  LazarusForm.ico
+  lazaruspackage.ico
+  LazarusSource.ico
+  lprfile.ico
+	template.png
+
+-----------------------------------------
+
+The following images were created by regs:
+
+codecompletion folder:
+cc_class.png, cc_class_150.png, cc_class_200.png
+cc_constant.png, cc_constant_150.png, cc_constant_200.png
+cc_constructor.png, cc_constructor_150.png, cc_constructor_200.png
+cc_destructor.png, cc_destructor_150.png, cc_destructor_200.png
+cc_enum.png, cc_enum_150.png, cc_enum_200.png
+cc_function.png, cc_function_150.png, cc_function_200.png
+cc_label.png, cc_label_150.png, cc_label_200.png
+cc_namespace.png, cc_namespace_150.png, cc_namespace_200.png
+cc_procedure.png, cc_procedure_150.png, cc_procedure_200.png
+cc_property.png, cc_property_150.png, cc_property_200.png
+cc_property_ro.png, cc_property_ro_150.png, cc_property_ro_200.png
+cc_record.png, cc_record_150.png, cc_record_200.png
+cc_type.png, cc_type_150.png, cc_type_200.png
+cc_unit.png, cc_unit_150.png, cc_unit_200.png
+cc_variable.png, cc_variable_150.png, cc_variable_200.png

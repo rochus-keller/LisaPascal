@@ -1,7 +1,7 @@
 #ifndef LISACODEMODEL_H
 #define LISACODEMODEL_H
 
-/*
+/* 
 * Copyright 2023 Rochus Keller <mailto:me@rochus-keller.ch>
 *
 * This file is part of the Lisa Pascal Navigator application.
@@ -36,7 +36,7 @@ class Thing
 {
 public:
     enum Kind { Undefined,
-       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, Param, Label, Field, Module,
+       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, Label, Param, Field, Module,
        /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
        /* IncludeFile: */ Include,
@@ -175,16 +175,43 @@ public:
     ~CodeFolder() { clear(); }
 };
 
-class CodeModel : public QAbstractItemModel
+struct ModelItem
+{
+    Thing* d_thing;
+    QList<ModelItem*> d_children;
+    ModelItem* d_parent;
+    ModelItem(ModelItem* p = 0, Thing* t = 0):d_parent(p),d_thing(t){ if( p ) p->d_children.append(this); }
+    ~ModelItem() { foreach( ModelItem* s, d_children ) delete s; }
+    static bool lessThan( const ModelItem* lhs, const ModelItem* rhs);
+};
+
+class ItemModel : public QAbstractItemModel
+{
+    Q_OBJECT
+public:
+    explicit ItemModel(QObject *parent = 0);
+    const Thing* getThing(const QModelIndex& index) const;
+    QModelIndex findThing(const Thing* nt) const;
+
+    // overrides
+    int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
+    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
+    QModelIndex index ( int row, int column, const QModelIndex & parent = QModelIndex() ) const;
+    QModelIndex parent ( const QModelIndex & index ) const;
+    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
+    Qt::ItemFlags flags ( const QModelIndex & index ) const { return Qt::ItemIsEnabled | Qt::ItemIsSelectable; }
+protected:
+    QModelIndex findThing(const ModelItem* slot,const Thing* nt) const;
+    ModelItem d_root;
+};
+
+class CodeModel : public ItemModel
 {
     Q_OBJECT
 public:
     explicit CodeModel(QObject *parent = 0);
-    ~CodeModel();
 
     bool load( const QString& rootDir );
-    const Thing* getThing(const QModelIndex& index) const;
-    QModelIndex findThing(const Thing* nt) const;
     Symbol* findSymbolBySourcePos(const QString& path, int line, int col) const;
     FileSystem* getFs() const { return d_fs; }
     quint32 getSloc() const { return d_sloc; }
@@ -194,29 +221,12 @@ public:
     Ranges getMutes( const QString& path );
 
     // overrides
-    int columnCount ( const QModelIndex & parent = QModelIndex() ) const { return 1; }
     QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
-    QModelIndex index ( int row, int column, const QModelIndex & parent = QModelIndex() ) const;
-    QModelIndex parent ( const QModelIndex & index ) const;
-    int rowCount ( const QModelIndex & parent = QModelIndex() ) const;
-    Qt::ItemFlags flags ( const QModelIndex & index ) const;
-
 protected:
     void parseAndResolve(UnitFile*);
 
 private:
-    struct Slot
-    {
-        Thing* d_thing;
-        QList<Slot*> d_children;
-        Slot* d_parent;
-        Slot(Slot* p = 0, Thing* t = 0):d_parent(p),d_thing(t){ if( p ) p->d_children.append(this); }
-        ~Slot() { foreach( Slot* s, d_children ) delete s; }
-    };
-    static bool lessThan( const Slot* lhs, const Slot* rhs);
-    void fillFolders(Slot* root, const FileSystem::Dir* super, CodeFolder* top, QList<Slot*>& fileSlots);
-    QModelIndex findThing(const Slot* slot,const Thing* nt) const;
-    Slot d_root;
+    void fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeFolder* top, QList<ModelItem*>& fileSlots);
     FileSystem* d_fs;
     CodeFolder d_top;
     Scope d_globals;
@@ -225,6 +235,22 @@ private:
     quint32 d_sloc; // number of lines of code without empty or comment lines
     QHash<QString,Ranges> d_mutes;
 };
+
+class ModuleDetailMdl : public ItemModel
+{
+    Q_OBJECT
+public:
+    explicit ModuleDetailMdl(QObject *parent = 0);
+
+    void load(UnitFile*);
+
+    // overrides
+    QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
+private:
+    void fillItems(ModelItem* parentItem, Scope* scope );
+    UnitFile* d_uf;
+};
+
 }
 
 #endif // LISACODEMODEL_H

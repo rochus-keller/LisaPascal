@@ -19,12 +19,14 @@
 
 #include "LisaCodeModel.h"
 #include "LisaPpLexer.h"
-#include "LisaParser.h"
+#include "LisaParser.h" 
 #include <QFile>
 #include <QPixmap>
 #include <QtDebug>
 #include <QCoreApplication>
 using namespace Lisa;
+
+#define LISA_WITH_MISSING
 
 class CodeModelVisitor
 {
@@ -259,7 +261,7 @@ private:
             const Deferred& def = d_deferred[i];
             if( def.sym == 0 )
                 def.pointer->d_type = resolvedType(type_identifier(def.scope,def.typeIdent));
-#if LISA_CHECK_COVERAGE
+#ifdef LISA_WITH_MISSING
             else if( def.sym->d_decl == 0 && !def.typeIdent->d_children.isEmpty())
             {
                 Token t = def.typeIdent->d_children.first()->d_tok;
@@ -735,7 +737,7 @@ private:
     Symbol* addSym(Scope* scope, const Token& t)
     {
         Declaration* d = scope->findDecl(t.d_id);
-#ifndef LISA_CHECK_COVERAGE
+#ifndef LISA_WITH_MISSING
         if( d )
 #else
         if( true )
@@ -1121,19 +1123,15 @@ private:
 protected:
 };
 
-CodeModel::CodeModel(QObject *parent) : QAbstractItemModel(parent),d_sloc(0)
+CodeModel::CodeModel(QObject *parent) : ItemModel(parent),d_sloc(0)
 {
     d_fs = new FileSystem(this);
-}
-
-CodeModel::~CodeModel()
-{
 }
 
 bool CodeModel::load(const QString& rootDir)
 {
     beginResetModel();
-    d_root = Slot();
+    d_root = ModelItem();
     d_top.clear();
     d_globals.clear();
     d_map1.clear();
@@ -1141,33 +1139,46 @@ bool CodeModel::load(const QString& rootDir)
     d_sloc = 0;
     d_mutes.clear();
     d_fs->load(rootDir);
-    QList<Slot*> fileSlots;
+    QList<ModelItem*> fileSlots;
     fillFolders(&d_root,&d_fs->getRoot(), &d_top, fileSlots);
-    foreach( Slot* s, fileSlots )
+    foreach( ModelItem* s, fileSlots )
     {
         Q_ASSERT( s->d_thing && s->d_thing->d_kind == Thing::Unit);
         UnitFile* f = static_cast<UnitFile*>(s->d_thing);
         Q_ASSERT( f->d_file );
         parseAndResolve(f);
         for( int i = 0; i < f->d_includes.size(); i++ )
-            new Slot(s, f->d_includes[i]);
+        {
+            if( f->d_includes[i]->d_file != 0 )
+                new ModelItem(s, f->d_includes[i]);
+        }
     }
     endResetModel();
     return true;
 }
 
-const Thing* CodeModel::getThing(const QModelIndex& index) const
+ItemModel::ItemModel(QObject* parent):QAbstractItemModel(parent)
+{
+
+}
+
+const Thing* ItemModel::getThing(const QModelIndex& index) const
 {
     if( !index.isValid() )
         return 0;
-    Slot* s = static_cast<Slot*>( index.internalPointer() );
+    ModelItem* s = static_cast<ModelItem*>( index.internalPointer() );
     Q_ASSERT( s != 0 );
     return s->d_thing;
 }
 
-QModelIndex CodeModel::findThing(const Thing* nt) const
+QModelIndex ItemModel::findThing(const Thing* nt) const
 {
     return findThing( &d_root, nt );
+}
+
+QVariant ItemModel::data(const QModelIndex& index, int role) const
+{
+    return QVariant();
 }
 
 Symbol*CodeModel::findSymbolBySourcePos(const QString& path, int line, int col) const
@@ -1217,7 +1228,7 @@ Ranges CodeModel::getMutes(const QString& path)
 
 QVariant CodeModel::data(const QModelIndex& index, int role) const
 {
-    Slot* s = static_cast<Slot*>( index.internalPointer() );
+    ModelItem* s = static_cast<ModelItem*>( index.internalPointer() );
     Q_ASSERT( s != 0 );
     switch( role )
     {
@@ -1269,12 +1280,12 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
     return QVariant();
 }
 
-QModelIndex CodeModel::index(int row, int column, const QModelIndex& parent) const
+QModelIndex ItemModel::index(int row, int column, const QModelIndex& parent) const
 {
-    const Slot* s = &d_root;
+    const ModelItem* s = &d_root;
     if( parent.isValid() )
     {
-        s = static_cast<Slot*>( parent.internalPointer() );
+        s = static_cast<ModelItem*>( parent.internalPointer() );
         Q_ASSERT( s != 0 );
     }
     if( row < s->d_children.size() && column < columnCount( parent ) )
@@ -1283,11 +1294,11 @@ QModelIndex CodeModel::index(int row, int column, const QModelIndex& parent) con
         return QModelIndex();
 }
 
-QModelIndex CodeModel::parent(const QModelIndex& index) const
+QModelIndex ItemModel::parent(const QModelIndex& index) const
 {
     if( index.isValid() )
     {
-        Slot* s = static_cast<Slot*>( index.internalPointer() );
+        ModelItem* s = static_cast<ModelItem*>( index.internalPointer() );
         Q_ASSERT( s != 0 );
         if( s->d_parent == &d_root )
             return QModelIndex();
@@ -1299,21 +1310,15 @@ QModelIndex CodeModel::parent(const QModelIndex& index) const
         return QModelIndex();
 }
 
-int CodeModel::rowCount(const QModelIndex& parent) const
+int ItemModel::rowCount(const QModelIndex& parent) const
 {
     if( parent.isValid() )
     {
-        Slot* s = static_cast<Slot*>( parent.internalPointer() );
+        ModelItem* s = static_cast<ModelItem*>( parent.internalPointer() );
         Q_ASSERT( s != 0 );
         return s->d_children.size();
     }else
         return d_root.d_children.size();
-}
-
-Qt::ItemFlags CodeModel::flags(const QModelIndex& index) const
-{
-    Q_UNUSED(index)
-    return Qt::ItemIsEnabled | Qt::ItemIsSelectable; //  | Qt::ItemIsDragEnabled;
 }
 
 void CodeModel::parseAndResolve(UnitFile* unit)
@@ -1366,7 +1371,8 @@ void CodeModel::parseAndResolve(UnitFile* unit)
         sym->d_decl = inc;
         sym->d_loc = f.d_loc;
         unit->d_syms[f.d_sourcePath].append(sym);
-        d_map2[f.d_inc->d_realPath] = inc;
+        if( f.d_inc )
+            d_map2[f.d_inc->d_realPath] = inc;
         unit->d_includes.append(inc);
     }
     d_sloc += lex.getSloc();
@@ -1379,11 +1385,11 @@ void CodeModel::parseAndResolve(UnitFile* unit)
     QCoreApplication::processEvents();
 }
 
-QModelIndex CodeModel::findThing(const CodeModel::Slot* slot, const Thing* nt) const
+QModelIndex ItemModel::findThing(const ModelItem* slot, const Thing* nt) const
 {
     for( int i = 0; i < slot->d_children.size(); i++ )
     {
-        Slot* s = slot->d_children[i];
+        ModelItem* s = slot->d_children[i];
         if( s->d_thing == nt )
             return createIndex( i, 0, s );
         QModelIndex index = findThing( s, nt );
@@ -1393,21 +1399,21 @@ QModelIndex CodeModel::findThing(const CodeModel::Slot* slot, const Thing* nt) c
     return QModelIndex();
 }
 
-bool CodeModel::lessThan(const CodeModel::Slot* lhs, const CodeModel::Slot* rhs)
+bool ModelItem::lessThan(const ModelItem* lhs, const ModelItem* rhs)
 {
     if( lhs->d_thing == 0 || rhs->d_thing == 0 )
         return false;
     return lhs->d_thing->getName().compare(rhs->d_thing->getName(),Qt::CaseInsensitive) < 0;
 }
 
-void CodeModel::fillFolders(CodeModel::Slot* root, const FileSystem::Dir* super, CodeFolder* top, QList<CodeModel::Slot*>& fileSlots)
+void CodeModel::fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeFolder* top, QList<ModelItem*>& fileSlots)
 {
     for( int i = 0; i < super->d_subdirs.size(); i++ )
     {
         CodeFolder* f = new CodeFolder();
         f->d_dir = super->d_subdirs[i];
         top->d_subs.append(f);
-        Slot* s = new Slot(root,f);
+        ModelItem* s = new ModelItem(root,f);
         fillFolders(s,super->d_subdirs[i],f,fileSlots);
     }
     for( int i = 0; i < super->d_files.size(); i++ )
@@ -1420,11 +1426,11 @@ void CodeModel::fillFolders(CodeModel::Slot* root, const FileSystem::Dir* super,
             d_map1[f->d_file] = f;
             d_map2[f->d_file->d_realPath] = f;
             top->d_files.append(f);
-            Slot* s = new Slot(root,f);
+            ModelItem* s = new ModelItem(root,f);
             fileSlots.append(s);
         }
     }
-    std::sort( root->d_children.begin(), root->d_children.end(), lessThan );
+    std::sort( root->d_children.begin(), root->d_children.end(), ModelItem::lessThan );
 
 }
 
@@ -1608,6 +1614,8 @@ void CodeFolder::clear()
 
 FilePos IncludeFile::getLoc() const
 {
+    if( d_file == 0 )
+        return FilePos();
     return FilePos( RowCol(1,1), d_file->d_realPath );
 }
 
@@ -1674,4 +1682,94 @@ Type::~Type()
 {
     if( d_members )
         delete d_members;
+}
+
+
+ModuleDetailMdl::ModuleDetailMdl(QObject* parent)
+{
+
+}
+
+void ModuleDetailMdl::load(UnitFile* uf)
+{
+    if( uf == 0 || d_uf == uf )
+        return;
+
+    beginResetModel();
+    d_root = ModelItem();
+    d_uf = uf;
+
+    if( d_uf->d_intf )
+    {
+        ModelItem* title = new ModelItem( &d_root, d_uf->d_intf );
+        fillItems(title, d_uf->d_intf);
+
+        title = new ModelItem( &d_root, d_uf->d_impl );
+        fillItems(title, d_uf->d_impl);
+
+    }else
+        fillItems(&d_root, d_uf->d_impl);
+
+    endResetModel();
+}
+
+QVariant ModuleDetailMdl::data(const QModelIndex& index, int role) const
+{
+    ModelItem* s = static_cast<ModelItem*>( index.internalPointer() );
+    Q_ASSERT( s != 0 );
+    switch( role )
+    {
+    case Qt::DisplayRole:
+        switch( s->d_thing->d_kind )
+        {
+        case Thing::Interface:
+            return "interface";
+        case Thing::Implementation:
+            return "implementation";
+        default:
+            return s->d_thing->getName();
+        }
+        break;
+    case Qt::DecorationRole:
+        switch( s->d_thing->d_kind )
+        {
+        case Thing::Interface:
+            return QPixmap(":/images/interface.png");
+        case Thing::Implementation:
+            return QPixmap(":/images/implementation.png");
+        case Thing::Const:
+            return QPixmap(":/images/constant.png");
+        case Thing::TypeDecl:
+            return QPixmap(":/images/type.png");
+        case Thing::Var:
+            return QPixmap(":/images/variable.png");
+        case Thing::Func:
+            return QPixmap(":/images/function.png");
+        case Thing::Proc:
+            return QPixmap(":/images/procedure.png");
+        case Thing::Label:
+            return QPixmap(":/images/label.png");
+        }
+        break;
+    }
+    return QVariant();
+}
+
+static bool DeclLessThan(Declaration* lhs, Declaration* rhs)
+{
+    return lhs->getName() < rhs->getName();
+}
+
+void ModuleDetailMdl::fillItems(ModelItem* parentItem, Scope* scope)
+{
+    QVector<QList<Declaration*> > elems(5);
+    foreach( Declaration* d, scope->d_order )
+        elems[ d->d_kind >= Thing::Proc ? d->d_kind-2 : d->d_kind-1 ].append(d);
+    for( int i = 1; i < elems.size()-1; i++ ) // leave out consts and labels
+    {
+        QList<Declaration*> d = elems[i];
+        std::sort( d.begin(), d.end(), DeclLessThan );
+        for( int j = 0; j < d.size(); j++ )
+            new ModelItem(parentItem,d[j]);
+    }
 }

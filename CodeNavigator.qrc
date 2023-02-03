@@ -5,5 +5,13 @@
         <file>images/include.png</file>
         <file>fonts/DejaVuSansMono.ttf</file>
         <file>fonts/NotoSans.ttf</file>
+        <file>images/constant.png</file>
+        <file>images/function.png</file>
+        <file>images/implementation.png</file>
+        <file>images/interface.png</file>
+        <file>images/label.png</file>
+        <file>images/procedure.png</file>
+        <file>images/type.png</file>
+        <file>images/variable.png</file>
     </qresource>
 </RCC>

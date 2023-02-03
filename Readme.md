@@ -25,7 +25,7 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] BUSY & LeanQt build
 - [x] resolve qualifiers by type for navigation of record fields
 - [x] precompiled binary versions for main platforms
-- [ ] Module detail outline view
+- [x] Module detail outline view
 - [ ] MC68000 assembler integrated with code model and symbol navigation
 
 #### Features in evaluation

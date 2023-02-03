@@ -91,7 +91,7 @@ class CodeNavigator::Viewer : public QPlainTextEdit
 public:
     QString d_path;
     typedef QList<QTextEdit::ExtraSelection> ESL;
-    ESL d_link, d_nonTerms, d_mutes;
+    ESL d_link, d_nonTerms, d_mutes, d_missing;
     CodeNavigator* d_that;
     Symbol* d_goto;
     Highlighter* d_hl;
@@ -134,10 +134,8 @@ public:
         QByteArray buf = in.readAll();
         buf.chop(1);
         setPlainText( QString::fromLatin1(buf) );
-#ifdef LISA_CHECK_COVERAGE
-        testMarkAllNonTerm(); // TEST
-#endif
         markMutes( that()->d_mdl->getMutes(path) );
+        markMissing();
         that()->syncModuleList();
         return true;
     }
@@ -154,7 +152,7 @@ public:
                                                                           cur.positionInBlock() + 1);
             const bool alreadyArrow = !d_link.isEmpty();
             d_link.clear();
-            if( id && id->d_decl )
+            if( id && id->d_decl && ( id->d_decl->isDeclaration() || id->d_decl->getFile() ) )
             {
                 const int off = cur.positionInBlock() + 1 - id->d_loc.d_col;
                 cur.setPosition(cur.position() - off);
@@ -207,6 +205,7 @@ public:
         ESL sum;
 
         sum << d_mutes;
+        sum << d_missing;
 
         QTextEdit::ExtraSelection line;
         line.format.setBackground(QColor(Qt::yellow).lighter(150));
@@ -216,7 +215,6 @@ public:
         sum << line;
 
         sum << d_nonTerms;
-
         sum << d_link;
 
         setExtraSelections(sum);
@@ -239,6 +237,8 @@ public:
     }
     void setPosition(const FilePos& pos, bool center, bool pushPosition )
     {
+        if( pos.d_filePath.isEmpty() )
+            return;
         const int line = pos.d_pos.d_row - 1;
         const int col = pos.d_pos.d_col - 1;
         loadFile( pos.d_filePath );
@@ -256,6 +256,7 @@ public:
             updateExtraSelections();
             if( pushPosition )
                 that()->pushLocation(Place(pos,verticalScrollBar()->value()));
+            setFocus();
         }
     }
 
@@ -278,32 +279,35 @@ public:
         }
     }
 
-    void testMarkAllNonTerm()
+    void markMissing()
     {
-        // TEST
-        d_nonTerms.clear();
+        d_missing.clear();
         QTextCharFormat missing;
+#if 0
         missing.setBackground( QColor(Qt::red).lighter(170));
-        QTextCharFormat underline;
-        underline.setFontUnderline(true);
-        underline.setUnderlineColor(Qt::magenta);
-        underline.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+#else
+        missing.setUnderlineColor(QColor(Qt::red));
+        missing.setFontUnderline(true);
+        missing.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+#endif
         UnitFile* uf = that()->d_mdl->getUnitFile(d_path);
         if( uf == 0 )
             return;
         const UnitFile::SymList& syms = uf->d_syms.value(d_path);
         foreach( const Symbol* n, syms )
         {
-#if 1
-            if( n->d_decl != 0 )
-                continue;
-#endif
+            if( n->d_decl != 0 && n->d_decl->isDeclaration() )
+                continue; // we're not interested in Symbols pointing to a Declaration here
             RowCol loc = n->d_loc;
             QTextCursor c( document()->findBlockByNumber( loc.d_row - 1) );
             c.setPosition( c.position() + loc.d_col - 1 );
-            if( n->d_decl )
-                c.setPosition( c.position() + n->d_decl->getLen(), QTextCursor::KeepAnchor );
-            else
+            if( n->d_decl && n->d_decl->d_kind == Thing::Include )
+            {
+                IncludeFile* inc = static_cast<IncludeFile*>(n->d_decl);
+                if( inc->d_file != 0 )
+                    continue;
+                c.setPosition( c.position() + inc->d_len,QTextCursor::KeepAnchor );
+            }else
             {
                 c.movePosition(QTextCursor::EndOfWord,QTextCursor::KeepAnchor);
                 if( s_builtIns.contains(c.selectedText().toUpper()) )
@@ -311,10 +315,10 @@ public:
             }
 
             QTextEdit::ExtraSelection sel;
-            sel.format = n->d_decl ? underline : missing;
+            sel.format = missing;
             sel.cursor = c;
 
-            d_nonTerms << sel;
+            d_missing << sel;
         }
         updateExtraSelections();
     }
@@ -436,6 +440,7 @@ CodeNavigator::CodeNavigator(QWidget *parent) : QMainWindow(parent),d_pushBackLo
     setCorner( Qt::TopLeftCorner, Qt::LeftDockWidgetArea );
 
     createModuleList();
+    createDetails();
     createUsedBy();
     createLog();
 
@@ -513,18 +518,37 @@ void CodeNavigator::createModuleList()
     dock->setObjectName("Modules");
     dock->setAllowedAreas( Qt::AllDockWidgetAreas );
     dock->setFeatures( QDockWidget::DockWidgetMovable );
-    d_things = new QTreeView(dock);
-    d_things->setAlternatingRowColors(true);
-    d_things->setHeaderHidden(true);
-    d_things->setSortingEnabled(false);
-    d_things->setAllColumnsShowFocus(true);
-    d_things->setRootIsDecorated(true);
-    d_things->setExpandsOnDoubleClick(false);
+    d_modules = new QTreeView(dock);
+    d_modules->setAlternatingRowColors(true);
+    d_modules->setHeaderHidden(true);
+    d_modules->setSortingEnabled(false);
+    d_modules->setAllColumnsShowFocus(true);
+    d_modules->setRootIsDecorated(true);
     d_mdl = new CodeModel(this);
-    d_things->setModel(d_mdl);
-    dock->setWidget(d_things);
+    d_modules->setModel(d_mdl);
+    dock->setWidget(d_modules);
     addDockWidget( Qt::LeftDockWidgetArea, dock );
-    connect( d_things,SIGNAL(doubleClicked(QModelIndex)), this, SLOT(onModuleDblClick(QModelIndex)) );
+    connect( d_modules,SIGNAL(doubleClicked(QModelIndex)), this, SLOT(onModuleDblClick(QModelIndex)) );
+}
+
+void CodeNavigator::createDetails()
+{
+    QDockWidget* dock = new QDockWidget( tr("Declarations"), this );
+    dock->setObjectName("Declarations");
+    dock->setAllowedAreas( Qt::AllDockWidgetAreas );
+    dock->setFeatures( QDockWidget::DockWidgetMovable );
+    d_module = new QTreeView(dock);
+    d_module->setAlternatingRowColors(true);
+    d_module->setHeaderHidden(true);
+    d_module->setSortingEnabled(false);
+    d_module->setAllColumnsShowFocus(true);
+    d_module->setRootIsDecorated(true);
+    d_module->setExpandsOnDoubleClick(false);
+    d_mdl2 = new ModuleDetailMdl(this);
+    d_module->setModel(d_mdl2);
+    dock->setWidget(d_module);
+    addDockWidget( Qt::LeftDockWidgetArea, dock );
+    connect( d_module,SIGNAL(doubleClicked(QModelIndex)), this, SLOT(onItemDblClick(QModelIndex)) );
 }
 
 void CodeNavigator::createUsedBy()
@@ -657,25 +681,17 @@ void CodeNavigator::setPathTitle(const FileSystem::File* f, int row, int col)
                              arg(col));
 }
 
-void CodeNavigator::syncModuleList(Declaration* d)
-{
-    // sync the module list with what is pointed on
-    QModelIndex i = d_mdl->findThing( d->getUnitFile() );
-    if( i.isValid() )
-    {
-        d_things->setCurrentIndex(i);
-        d_things->scrollTo( i ,QAbstractItemView::PositionAtCenter );
-    }
-}
-
 void CodeNavigator::syncModuleList()
 {
     QModelIndex i = d_mdl->findThing( d_mdl->getCodeFile(d_view->d_path) );
     if( i.isValid() )
     {
-        d_things->setCurrentIndex(i);
-        d_things->scrollTo( i ,QAbstractItemView::PositionAtCenter );
+        d_modules->setCurrentIndex(i);
+        d_modules->scrollTo( i ,QAbstractItemView::EnsureVisible );
     }
+    d_mdl2->load( d_mdl->getUnitFile(d_view->d_path));
+    d_module->expandAll();
+    d_module->scrollToTop();
 }
 
 void CodeNavigator::closeEvent(QCloseEvent* event)
@@ -696,14 +712,21 @@ void CodeNavigator::onCursorPositionChanged()
     Symbol* id = d_mdl->findSymbolBySourcePos(d_view->d_path,line,col);
     if( id && id->d_decl && id->d_decl->isDeclaration() )
     {
-        fillUsedBy( id, static_cast<Declaration*>(id->d_decl) );
+        Declaration* d = static_cast<Declaration*>(id->d_decl);
+        fillUsedBy( id, d );
 
         // mark all symbols in file which have the same declaration
-        Declaration* d = static_cast<Declaration*>(id->d_decl);
         QList<Symbol*> syms = d->d_refs.value(d_view->d_path);
         d_view->markNonTerms(syms);
 
-        // syncModuleList(d);
+        if( !(id->d_loc == d->d_loc.d_pos) && d->d_impl )
+            d = d->d_impl;
+        QModelIndex i = d_mdl2->findThing( d );
+        if( i.isValid() )
+        {
+            d_module->setCurrentIndex(i);
+            d_module->scrollTo( i ,QAbstractItemView::EnsureVisible );
+        }
     }
 }
 
@@ -722,7 +745,7 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     {
         const IncludeFile* f = static_cast<const IncludeFile*>(nt);
         d_view->loadFile(f->d_file->d_realPath);
-    }
+    } 
 
 
     if( nt->isDeclaration() )
@@ -730,6 +753,15 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
         const Declaration* d = static_cast<const Declaration*>(nt);
         d_view->setPosition( d->getLoc(), true, false );
     }
+}
+
+void CodeNavigator::onItemDblClick(const QModelIndex& i)
+{
+    const Thing* nt = d_mdl->getThing(i);
+    if( nt == 0 || !nt->isDeclaration() )
+        return;
+
+    d_view->setPosition( nt->getLoc(), true, true );
 }
 
 void CodeNavigator::onUsedByDblClicked()
@@ -740,11 +772,6 @@ void CodeNavigator::onUsedByDblClicked()
     FilePos pos = d_usedBy->currentItem()->data(0,Qt::UserRole).value<FilePos>();
     if( pos.d_filePath.isEmpty() )
         return;
-#if 0
-    Symbol* sym = d_usedBy->currentItem()->data(0,Qt::UserRole+1).value<Symbol*>();
-    if( sym && sym->d_decl && sym->d_decl->isDeclaration() )
-        syncModuleList(static_cast<Declaration*>(sym->d_decl));
-#endif
     d_view->setPosition( pos, true, true );
 }
 
@@ -855,7 +882,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.6.3");
+    a.setApplicationVersion("0.7.1");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

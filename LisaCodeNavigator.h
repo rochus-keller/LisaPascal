@@ -33,6 +33,7 @@ class QModelIndex;
 namespace Lisa
 {
 class CodeModel;
+class ModuleDetailMdl;
 class Symbol;
 class Declaration;
 
@@ -58,13 +59,13 @@ protected:
     };
 
     void createModuleList();
+    void createDetails();
     void createUsedBy();
     void createLog();
     void pushLocation( const Place& );
     void showViewer( const Place& );
     void fillUsedBy(Symbol* id, Declaration*);
     void setPathTitle(const FileSystem::File* f, int row, int col);
-    void syncModuleList(Declaration*);
     void syncModuleList();
 
     // overrides
@@ -73,6 +74,7 @@ protected:
 protected slots:
     void onCursorPositionChanged();
     void onModuleDblClick(const QModelIndex&);
+    void onItemDblClick(const QModelIndex&);
     void onUsedByDblClicked();
     void onGoBack();
     void onGoForward();
@@ -90,10 +92,12 @@ private:
     Viewer* d_view;
     QLabel* d_pathTitle;
     QPlainTextEdit* d_msgLog;
-    QTreeView* d_things;
+    QTreeView* d_modules;
+    QTreeView* d_module;
     QLabel* d_usedByTitle;
     QTreeWidget* d_usedBy;
     CodeModel* d_mdl;
+    ModuleDetailMdl* d_mdl2;
     QString d_dir;
 
     QList<Place> d_backHisto; // d_backHisto.last() is current place
