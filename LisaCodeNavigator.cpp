@@ -83,7 +83,8 @@ static QSet<QString> s_builtIns = QSet<QString>() << "ABS" << "ARCTAN" << "CHR" 
                                                           << "PWROFTEN" << "LENGTH" << "POS" << "CONCAT"
                                                           << "COPY" << "DELETE" << "INSERT" << "MOVELEFT"
                                                           << "MOVERIGHT" << "SIZEOF" << "SCANEQ" << "SCANNE"
-                                                          << "FILLCHAR" << "COS" << "HALT";
+                                                          << "FILLCHAR" << "COS" << "HALT"
+                                                          << "THISCLASS";
 static QList<QByteArray> s_keywords = QList<QByteArray>() << "ABSTRACT" << "CLASSWIDE" << "OVERRIDE" << "DEFAULT";
 
 class CodeNavigator::Viewer : public QPlainTextEdit
@@ -614,6 +615,11 @@ static bool SymsLessThan( const Symbol* lhs, const Symbol* rhs )
     return lhs->d_loc.packed() < rhs->d_loc.packed();
 }
 
+static bool FilesLessThan(const QPair<QString,Declaration::SymList>& lhs, const QPair<QString,Declaration::SymList>& rhs)
+{
+    return lhs.first < rhs.first;
+}
+
 void CodeNavigator::fillUsedBy(Symbol* id, Declaration* nt)
 {
     d_usedBy->clear();
@@ -622,7 +628,7 @@ void CodeNavigator::fillUsedBy(Symbol* id, Declaration* nt)
     else
         d_usedByTitle->setText(QString("%1").arg(nt->typeName()) );
 
-    QList< QPair<QString,Declaration::SymList> > all;
+    QList< QPair<QString,Declaration::SymList> > all; // filePath -> syms in file
     Declaration::Refs::const_iterator dri;
     for( dri = nt->d_refs.begin(); dri != nt->d_refs.end(); ++dri )
     {
@@ -630,12 +636,15 @@ void CodeNavigator::fillUsedBy(Symbol* id, Declaration* nt)
         std::sort(list.begin(),list.end(), SymsLessThan);
         all << qMakePair(dri.key(),list);
     }
+    std::sort(all.begin(),all.end(),FilesLessThan);
 
 
     QTreeWidgetItem* curItem = 0;
     for( int i = 0; i < all.size(); i++ )
     {
         const QString path = all[i].first;
+        if( path.isEmpty() )
+            continue; // happens e.g. with SELF
         const FileSystem::File* file = d_mdl->getFs()->findFile(path);
         const QString fileName = file ? file->getVirtualPath(false) : QFileInfo(path).fileName();
         const Declaration::SymList& list = all[i].second;
@@ -882,7 +891,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.7.1");
+    a.setApplicationVersion("0.7.2");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

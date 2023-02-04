@@ -63,15 +63,16 @@ static QStringList collectFiles( const QDir& dir, const QStringList& suffix )
 
 bool FileSystem::load(const QString& rootDir)
 {
-    if( !QFileInfo(rootDir).isDir() )
+    QFileInfo dirInfo(rootDir.endsWith('/') ? rootDir : rootDir + "/");
+    if( !dirInfo.isDir() )
         return error("not a directory");
 
     d_root.clear();
     d_fileMap.clear();
     d_moduleMap.clear();
 
-    const QStringList files = collectFiles(rootDir,QStringList() << "*.txt");
-    const int off = rootDir.size();
+    const QStringList files = collectFiles(dirInfo.absolutePath(),QStringList() << "*.txt");
+    const int off = dirInfo.absolutePath().size();
 
     foreach( const QString& f, files )
     {

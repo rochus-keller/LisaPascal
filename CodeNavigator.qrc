@@ -13,5 +13,8 @@
         <file>images/procedure.png</file>
         <file>images/type.png</file>
         <file>images/variable.png</file>
+        <file>images/category.png</file>
+        <file>images/class.png</file>
+        <file>images/source.png</file>
     </qresource>
 </RCC>

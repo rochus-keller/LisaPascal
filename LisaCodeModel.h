@@ -36,7 +36,7 @@ class Thing
 {
 public:
     enum Kind { Undefined,
-       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, Label, Param, Field, Module,
+       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, MethBlock, Label, Param, Field, Module, Self,
        /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
        /* IncludeFile: */ Include,
@@ -48,7 +48,7 @@ public:
     virtual quint16 getLen() const { return 0; }
     virtual QString getName() const;
     virtual const FileSystem::File* getFile() const { return 0; }
-    bool isDeclaration() const { return d_kind >= Const && d_kind <= Module; }
+    bool isDeclaration() const { return d_kind >= Const && d_kind <= Self; }
     const char* typeName() const;
     Thing():d_kind(Undefined){}
     virtual ~Thing();
@@ -247,7 +247,8 @@ public:
     // overrides
     QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
 private:
-    void fillItems(ModelItem* parentItem, Scope* scope );
+    void fillItems(ModelItem* parentItem, Scope* scope);
+    void fillSubs(ModelItem* parentItem, Scope* scope);
     UnitFile* d_uf;
 };
 

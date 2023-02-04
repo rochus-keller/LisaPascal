@@ -202,7 +202,34 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == Tok_identifier)
-                addSym(scope,s->d_tok);
+            {
+                Declaration* cls = scope->findDecl(s->d_tok.d_id);
+                if( cls->d_type && cls->d_type->d_kind == Type::Class )
+                {
+                    Declaration* mb = addDecl(scope,s->d_tok,Thing::MethBlock, cls);
+
+                    mb->d_body = new Scope();
+                    mb->d_body->d_kind = Thing::Members;
+                    mb->d_body->d_outer = cls->d_type->d_members;
+                    mb->d_body->d_altOuter = scope;
+
+                    scope = mb->d_body;
+
+                    Token tmp;
+                    tmp.d_val = "SELF";
+                    // intenionally no loc or path in tmp
+                    tmp.d_id = Token::toId(tmp.d_val);
+                    Declaration* self = addDecl(scope,tmp,Thing::Self);
+                    self->d_type = cls->d_type;
+                    if( cls->d_type->d_type )
+                    {
+                        tmp.d_val = "SUPERSELF";
+                        tmp.d_id = Token::toId(tmp.d_val);
+                        Declaration* self = addDecl(scope,tmp,Thing::Self);
+                        self->d_type = cls->d_type;
+                    }
+                }
+            }
             if( s->d_tok.d_type == SynTree::R_procedure_and_function_declaration_part)
                 procedure_and_function_declaration_part(scope,s);
             if( s->d_tok.d_type == SynTree::R_statement_part)
@@ -281,7 +308,7 @@ private:
         }
         d_deferred.clear();
     }
-    Declaration* findInForwards(Scope* scope, const Token&t)
+    Declaration* findInForwards(const Token&t)
     {
         Declaration* res = 0;
         foreach( Declaration* d, d_forwards )
@@ -294,8 +321,21 @@ private:
         }
         return res;
     }
-
-    Declaration* addDecl(Scope* scope, const Token& t, int type )
+    Declaration* findInMembers(Scope* scope, const Token&t)
+    {
+        Declaration* res = 0;
+        // if this is in a class declaration search there
+        foreach( Declaration* d, scope->d_order )
+        {
+            if( d->d_id == t.d_id )
+            {
+                res = d;
+                break;
+            }
+        }
+        return res;
+    }
+    Declaration* addDecl(Scope* scope, const Token& t, int type, Declaration* cls = 0 )
     {
         Declaration* d = new Declaration();
         d->d_kind = type;
@@ -320,7 +360,7 @@ private:
         d_cf->d_syms[t.d_sourcePath].append(sy);
         d->d_me = sy;
 
-        if( isFuncProc && scope == d_cf->d_impl && ( fwd = findInForwards(scope,t) ) )
+        if( isFuncProc && scope == d_cf->d_impl && ( fwd = findInForwards(t) ) )
         {
             // add the present symbol which points to the interface twin
             sy->d_decl = fwd;
@@ -328,6 +368,16 @@ private:
 
             d_redirect[d] = fwd;
             fwd->d_impl = d;
+        }else if( isFuncProc && scope->d_kind == Thing::Members && ( fwd = findInMembers(scope->d_outer,t) ) )
+        {
+            sy->d_decl = fwd;
+            fwd->d_refs[t.d_sourcePath].append(sy);
+            fwd->d_impl = d;
+        }else if( type == Thing::MethBlock && cls )
+        {
+            sy->d_decl = cls;
+            cls->d_refs[t.d_sourcePath].append(sy);
+            cls->d_impl = d;
         }else
         {
             sy->d_decl = d;
@@ -563,7 +613,15 @@ private:
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_type_identifier)
-                type_identifier(scope,s); // the superclass
+            {
+                Type::Ref super = resolvedType(type_identifier(scope,s));
+                if( super && super->d_kind == Type::Class )
+                {
+                    rec->d_type = super;
+                    rec->d_members->d_altOuter = scope;
+                    rec->d_members->d_outer = super->d_members;
+                }
+            }
             if( s->d_tok.d_type == SynTree::R_field_list)
                 field_list(rec->d_members,s);
             if( s->d_tok.d_type == SynTree::R_method_interface)
@@ -584,6 +642,8 @@ private:
     }
     void defer( Symbol* sym, Type* pointer, Scope* scope, SynTree* typeIdent )
     {
+        // TODO: apparently in Clascal any type can be declared after its use; here we only support
+        // the original Pascal scope rules
         Deferred def;
         def.sym = sym;
         def.pointer = pointer;
@@ -1247,7 +1307,7 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
         switch( s->d_thing->d_kind )
         {
         case Thing::Unit:
-            return QPixmap(":/images/unit.png");
+            return QPixmap(":/images/source.png");
         case Thing::Include:
             return QPixmap(":/images/include.png");
         case Thing::Folder:
@@ -1749,6 +1809,8 @@ QVariant ModuleDetailMdl::data(const QModelIndex& index, int role) const
             return QPixmap(":/images/procedure.png");
         case Thing::Label:
             return QPixmap(":/images/label.png");
+        case Thing::MethBlock:
+            return QPixmap(":/images/category.png");
         }
         break;
     }
@@ -1762,14 +1824,37 @@ static bool DeclLessThan(Declaration* lhs, Declaration* rhs)
 
 void ModuleDetailMdl::fillItems(ModelItem* parentItem, Scope* scope)
 {
-    QVector<QList<Declaration*> > elems(5);
+    QVector<QList<Declaration*> > elems(Thing::Label);
     foreach( Declaration* d, scope->d_order )
-        elems[ d->d_kind >= Thing::Proc ? d->d_kind-2 : d->d_kind-1 ].append(d);
+    {
+        if( d->d_kind > Thing::Const && d->d_kind < Thing::Label )
+            elems[ d->d_kind >= Thing::Proc ? d->d_kind-1 : d->d_kind ].append(d);
+    }
     for( int i = 1; i < elems.size()-1; i++ ) // leave out consts and labels
     {
-        QList<Declaration*> d = elems[i];
+        QList<Declaration*>& d = elems[i];
         std::sort( d.begin(), d.end(), DeclLessThan );
         for( int j = 0; j < d.size(); j++ )
-            new ModelItem(parentItem,d[j]);
+        {
+            Declaration* dd = d[j];
+            ModelItem* item = new ModelItem(parentItem,dd);
+            if( dd->d_kind == Thing::TypeDecl && dd->d_type && dd->d_type->d_kind == Type::Class )
+                fillSubs(item,dd->d_type->d_members);
+            else if( dd->d_kind == Thing::MethBlock )
+                fillSubs(item,dd->d_body);
+        }
     }
+}
+
+void ModuleDetailMdl::fillSubs(ModelItem* parentItem, Scope* scope)
+{
+    QList<Declaration*> funcs;
+    foreach( Declaration* d, scope->d_order )
+    {
+        if( ( d->d_kind == Thing::Func || d->d_kind == Thing::Proc ) )
+            funcs.append(d);
+    }
+    std::sort( funcs.begin(), funcs.end(), DeclLessThan );
+    for( int j = 0; j < funcs.size(); j++ )
+        new ModelItem(parentItem,funcs[j]);
 }
