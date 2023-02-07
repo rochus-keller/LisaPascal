@@ -71,7 +71,7 @@ bool FileSystem::load(const QString& rootDir)
     d_fileMap.clear();
     d_moduleMap.clear();
 
-    const QStringList files = collectFiles(dirInfo.absolutePath(),QStringList() << "*.txt");
+    const QStringList files = collectFiles(dirInfo.absolutePath(),QStringList() << "*.txt" << "*.pas" << "*.inc");
     const int off = dirInfo.absolutePath().size();
 
     foreach( const QString& f, files )
@@ -158,6 +158,35 @@ bool FileSystem::load(const QString& rootDir)
     }
     qDebug() << count;
 #endif
+    return true;
+}
+
+bool FileSystem::addToRoot(const QStringList& files)
+{
+    // used for testing purpose
+
+    d_root.clear();
+    d_fileMap.clear();
+    d_moduleMap.clear();
+
+    foreach( const QString& f, files )
+    {
+        QFile in(f);
+        if( !in.open(QIODevice::ReadOnly) )
+            return error(tr("cannot open file for reading: %1").arg(f));
+        in.close();
+
+        QFileInfo info(f);
+
+        File* file = new File();
+        file->d_type = UnknownFile;
+        file->d_name = info.baseName();
+        file->d_moduleName = info.baseName();
+        file->d_realPath = f;
+        d_fileMap[f] = file;
+        file->d_dir = &d_root;
+        d_root.d_files.append(file);
+    }
     return true;
 }
 

@@ -1,0 +1,96 @@
+// Copyright 2023 Rochus Keller <mailto:me@rochus-keller.ch>
+
+// This grammar was synthesized from the "Lisa Workshop 3.0 Users Guide" (1984), the
+// "MC 68000 Programmer Reference Manual" (1991) and 
+// "Programming the 68000 - Macintosh Assembly Language" (1986), and then modified
+// until all assembler source files of the Lisa Source Code published by the CHM parsed without error
+
+program ::= { line }
+
+line ::= 
+	{ factor [addrop] [':']  // factor instead of ident to disambiguate with macrocall
+	| label [':']
+	} 
+	[ directive 
+	| statement 
+	| ',' argument { ',' argument }  // instead of macrocall
+	] eol
+
+directive ::= ( // the lexer eats the dot prefix; the parser only sees the token
+	( PROC | FUNC ) ident [ ',' number ]
+	| ( DEF | REF ) ident { ',' ident }
+	| ( SEG | ASCII | TITLE ) ( string | substitute )
+	| ( END | ENDM | ELSE | ENDC | LIST | NOLIST |  MACROLIST | NOMACROLIST | PATCHLIST | NOPATCHLIST )
+	| ( BYTE | WORD ) expression { ',' expression }
+	| ( ORG | RORG | IF | EQU ) expression
+	| INCLUDE filename
+	| macrodef
+	)
+
+statement ::=
+	mnemonic [ size ] [ argument { ',' argument } ]
+	//| macrocall
+
+mnemonic ::= 
+	BEQ | LSR | BNE | LSL | BGE | 'BLE' | 'DBF' | 'BMI' | 'ROR' | 'ASL' | 'ASR' | 'DBRA'
+	| 'BVC' | 'BPL' | 'BGT' | 'BLS' | 'BHI' | 'BLT' | 'DBEQ' | 'SNE' | 'ROL' | 'ROXR' | 'ROXL'
+	| BHS | BLO | BCC | BCS | ORI | ANDI | SUBI | ADDI | EORI | CMPI
+	| BTST | BCHG | BCLR | BSET | MOVEP | MOVEA | MOVE 
+	| NEGX | CLR | NEG | NOT | EXT | NBCD | SWAP | PEA | ILLEGAL | TAS | TST 
+	| TRAP | LINK | UNLK | RESET | NOP | STOP | RTE | RTS | TRAPV | RTR | JSR 
+	| JMP | MOVEM | LEA | CHK | ADDQ | SUBQ | BRA | BSR | MOVEQ | DIVU | DIVS 
+	| SBCD | OR | SUB | SUBX | SUBA | EOR | CMPM | CMP | CMPA | MULU | MULS 
+	| ABCD | EXG | AND | ADD | ADDX | ADDA
+
+size ::= dotW | dotL | dotB | dotS
+
+macrodef ::= MACRO ident [ '(' [ ident { ',' ident } ] ')' ]
+
+macrocall- ::= ident [ expression { ',' expression } ]
+
+argument ::=
+	\LA: 1:'-'&2:'('\  '-' addrop
+	| expression [ addrop ] 
+	| '#' expression
+	| addrop
+	| label
+
+expression ::= ['-'] factor { op factor }
+
+addrop ::= '(' expression [ size ] [ ',' reg ] ')' [ '+' | size ] 
+
+reg ::= ident [ size ] | substitute
+
+factor ::= ident | string | number | '<' expression '>' | substitute | '*'
+
+filename ::= ident { '/' ident }
+
+op ::= '+' | '-' | '~' | '^' | '*' | '/' | '|' | '&' | '=' | '<>' 
+	// backslash part of syntax but never used and EbnfStudio has issue
+
+number ::= 	// digit { digit } | '$' hexdigit { hexdigit } | hexdigit { hexdigit } 'H' | 
+			// octaldigit { octaldigit } 'O' | bindigit { bindigit } 'B'
+
+string ::=		// '"' any printable char '"' | '\'' any printable char '\''
+
+ident ::=	// alpha { alpha | digit | '%' | '_' | '.' }
+
+substitute ::= // '%' digit
+
+label ::=   	// '@' digit { digit }
+
+comment- ::= ';'
+Comment ::=
+
+eol ::= // \n
+
+dotW ::= // '.W'
+dotL ::= // '.L'
+dotB ::= // '.B'
+dotS ::= // '.S'
+
+
+
+// Pragmas
+%module ::= 'LisaPascal'
+%namespace ::= 'Asm'

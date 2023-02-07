@@ -65,6 +65,7 @@ public:
 
     explicit FileSystem(QObject *parent = 0);
     bool load( const QString& rootDir );
+    bool addToRoot( const QStringList& files );
     const QString& getError() const { return d_error; }
     const Dir& getRoot() const { return d_root; }
     const QString& getRootPath() const { return d_rootDir; }

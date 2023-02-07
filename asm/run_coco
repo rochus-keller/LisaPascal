@@ -1,0 +1,10 @@
+../../Coco/Coco ./LisaAsm.atg -trace FP -o . -namespace Asm > ./coco_out.txt
+
+mv ./Parser.h ../AsmParser.h
+mv ./Parser.cpp ../AsmParser.cpp
+
+mv ./AsmSynTree.h ..
+mv ./AsmSynTree.cpp ..
+
+mv ./AsmTokenType.h ..
+mv ./AsmTokenType.cpp ..
