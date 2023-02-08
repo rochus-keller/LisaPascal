@@ -1,4 +1,4 @@
-../../Coco/Coco ./LisaAsm.atg -trace FP -o . -namespace Asm > ./coco_out.txt
+../../Coco/Coco ./LisaAsm.atg -o . -namespace Asm 
 
 mv ./Parser.h ../AsmParser.h
 mv ./Parser.cpp ../AsmParser.cpp

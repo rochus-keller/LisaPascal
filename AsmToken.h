@@ -52,7 +52,7 @@ struct Token
         case Tok_TITLE: case Tok_END: case Tok_ENDM: case Tok_ELSE: case Tok_ENDC: case Tok_LIST:
         case Tok_NOLIST: case Tok_MACROLIST: case Tok_NOMACROLIST: case Tok_PATCHLIST: case Tok_NOPATCHLIST:
         case Tok_BYTE: case Tok_WORD: case Tok_ORG: case Tok_RORG: case Tok_IF: case Tok_EQU:
-        case Tok_INCLUDE: case Tok_MACRO:
+        case Tok_INCLUDE: case Tok_MACRO: case Tok_LONG: case Tok_PAGE:
             return true;
         default:
             return false;

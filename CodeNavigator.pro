@@ -24,7 +24,13 @@ HEADERS += \
     LisaParser.h \
     LisaRowCol.h \
     LisaFileSystem.h \
-    LisaPpLexer.h
+    LisaPpLexer.h \
+    AsmLexer.h \
+    AsmTokenType.h \
+    AsmToken.h \
+    AsmParser.h \
+    AsmPpLexer.h \
+    AsmSynTree.h
 
 SOURCES += \
     LisaLexer.cpp \
@@ -36,7 +42,12 @@ SOURCES += \
     LisaParser.cpp \
     LisaToken.cpp \
     LisaFileSystem.cpp \
-    LisaPpLexer.cpp
+    LisaPpLexer.cpp \
+    AsmLexer.cpp \
+    AsmTokenType.cpp \
+    AsmParser.cpp \
+    AsmPpLexer.cpp \
+    AsmSynTree.cpp
 
 RESOURCES += \
     CodeNavigator.qrc

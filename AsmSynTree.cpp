@@ -26,6 +26,7 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_reg: return "reg";
 		case R_size: return "size";
 		case R_statement: return "statement";
+		case R_term: return "term";
 	default: if(r<R_First) return tokenTypeName(r); else return "";
 }
 }

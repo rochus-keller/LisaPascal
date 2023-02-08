@@ -17,6 +17,7 @@
 #include "LisaFileSystem.h"
 #include "Converter.h"
 #include "LisaLexer.h"
+#include "AsmLexer.h"
 #include <QFile>
 #include <QtDebug>
 using namespace Lisa;
@@ -80,7 +81,9 @@ bool FileSystem::load(const QString& rootDir)
         if( !in.open(QIODevice::ReadOnly) )
             return error(tr("cannot open file for reading: %1").arg(f));
         QByteArray moduleName;
-        const FileType fileType = detectType(&in,&moduleName);
+        FileType fileType = detectType(&in,&moduleName);
+        if( fileType == UnknownFile )
+            fileType = detectType2(&in,&moduleName);
         if( fileType == UnknownFile )
             continue;
         in.close();
@@ -310,6 +313,44 @@ FileSystem::FileType FileSystem::detectType(QIODevice* in, QByteArray* name)
     return res;
 }
 
+FileSystem::FileType FileSystem::detectType2(QIODevice* in, QByteArray* name)
+{
+    Q_ASSERT(in);
+    in->reset();
+    Asm::Lexer lex;
+    lex.setStream(in);
+    Asm::Token t = lex.nextToken();
+    FileType res = UnknownFile;
+    int n = 0;
+    while( t.isValid() && n < 20 )
+    {
+        if( t.d_dotPrefix )
+        {
+            if( t.d_type == Asm::Tok_PROC || t.d_type == Asm::Tok_FUNC )
+            {
+                if( name )
+                {
+                    while( t.d_type != Asm::Tok_identifier && t.isValid() )
+                        t = lex.nextToken();
+                    if( t.d_type == Asm::Tok_identifier )
+                        *name = t.d_val;
+                }
+                return AsmUnit;
+            }else if( t.isDirective() )
+                res = AsmFragment;
+        }else
+        {
+            if( Asm::tokenTypeIsKeyword(t.d_type) )
+                res = AsmFragment;
+        }
+        n++;
+        t = lex.nextToken();
+    }
+    if( t.d_type == Asm::Tok_Invalid )
+        res = UnknownFile;
+    return res;
+}
+
 bool FileSystem::error(const QString& msg)
 {
     d_error = msg;
@@ -355,6 +396,9 @@ static const char* typeName(int t)
         return ".pas";
     case FileSystem::PascalFragment:
         return ".inc";
+    case FileSystem::AsmFragment:
+    case FileSystem::AsmUnit:
+        return ".asm";
     default:
         return "";
     }

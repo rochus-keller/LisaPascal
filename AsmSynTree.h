@@ -27,6 +27,7 @@ namespace Asm {
 			R_reg,
 			R_size,
 			R_statement,
+			R_term,
 			R_Last
 		};
 		SynTree(quint16 r = Tok_Invalid, const Token& = Token() );

@@ -39,6 +39,8 @@ public:
        /* Declaration: */ Const, TypeDecl, Var, Func, Proc, MethBlock, Label, Param, Field, Module, Self,
        /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
+       /* AsmFile: */ Assembler,
+       /* AsmInclude: */ AsmIncl,
        /* IncludeFile: */ Include,
        /* CodeFolder: */ Folder
     };
@@ -98,7 +100,7 @@ class Scope : public Thing
 {
 public:
     QList<Declaration*> d_order; // owns
-    Thing* d_owner; // either declaration or unit file or 0
+    Thing* d_owner; // either declaration or unit file or asm file or 0
     Scope* d_outer;
     Scope* d_altOuter; // to access params defined in interface declaration of func/proc
 
@@ -119,6 +121,8 @@ public:
 
 class IncludeFile;
 class UnitFile;
+class AsmFile;
+class AsmInclude;
 
 class CodeFile : public Thing
 {
@@ -127,7 +131,10 @@ public:
 
     UnitFile* toUnit();
     IncludeFile* toInclude();
+    AsmFile* toAsmFile();
+    AsmInclude* toAsmInclude();
 
+    QString getName() const;
     const FileSystem::File* getFile() const { return d_file; }
     CodeFile():d_file(0) {}
     ~CodeFile();
@@ -141,7 +148,6 @@ public:
 
     FilePos getLoc() const; // the landing place when we jump to this file
     quint16 getLen() const { return d_len; }
-    QString getName() const;
     IncludeFile():d_unit(0),d_len(0){ d_kind = Include; }
 };
 
@@ -156,10 +162,34 @@ public:
     QHash<QString,SymList> d_syms; // owns, all things we can click on in a code file ordered by row/col
     QList<IncludeFile*> d_includes; // owns
 
-    QString getName() const;
     QByteArrayList findUses() const;
     UnitFile():d_intf(0),d_impl(0),d_globals(0) { d_kind = Unit; }
     ~UnitFile();
+};
+
+class AsmInclude : public CodeFile
+{
+public:
+    quint16 d_len; // just to make the symbol of the include directive happy
+    quint16 d_col;
+    quint32 d_row;
+    AsmFile* d_unit;
+
+    FilePos getLoc() const; // the landing place when we jump to this file
+    quint16 getLen() const { return d_len; }
+    AsmInclude():d_len(0),d_col(0),d_row(0),d_unit(0){ d_kind = AsmIncl; }
+};
+
+class AsmFile : public CodeFile
+{
+public:
+    Scope* d_impl; // owns
+    QList<AsmInclude*> d_includes; // owns
+    typedef QList<Symbol*> SymList;
+    QHash<QString,SymList> d_syms; // owns, all things we can click on in a code file ordered by row/col
+
+    AsmFile():d_impl(0){ d_kind = Assembler; }
+    ~AsmFile();
 };
 
 class CodeFolder : public Thing
@@ -167,7 +197,7 @@ class CodeFolder : public Thing
 public:
     FileSystem::Dir* d_dir;
     QList<CodeFolder*> d_subs; // owns
-    QList<UnitFile*> d_files; // owns
+    QList<CodeFile*> d_files; // owns
 
     QString getName() const;
     void clear();
@@ -217,6 +247,7 @@ public:
     quint32 getSloc() const { return d_sloc; }
     CodeFile* getCodeFile(const QString& path) const;
     UnitFile* getUnitFile(const QString& path) const;
+    AsmFile* getAsmFile(const QString& path) const;
     Scope* getGlobals() { return &d_globals; }
     Ranges getMutes( const QString& path );
 
@@ -224,6 +255,7 @@ public:
     QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
 protected:
     void parseAndResolve(UnitFile*);
+    void parseAndResolve(AsmFile*);
 
 private:
     void fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeFolder* top, QList<ModelItem*>& fileSlots);
@@ -242,14 +274,15 @@ class ModuleDetailMdl : public ItemModel
 public:
     explicit ModuleDetailMdl(QObject *parent = 0);
 
-    void load(UnitFile*);
+    void load(Scope* intf, Scope* impl);
 
     // overrides
     QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
 private:
     void fillItems(ModelItem* parentItem, Scope* scope);
     void fillSubs(ModelItem* parentItem, Scope* scope);
-    UnitFile* d_uf;
+    Scope* d_intf;
+    Scope* d_impl;
 };
 
 }

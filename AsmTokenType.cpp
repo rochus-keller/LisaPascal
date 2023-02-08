@@ -29,6 +29,7 @@ namespace Asm {
 			case Tok_ADDI: return "ADDI";
 			case Tok_ADDQ: return "ADDQ";
 			case Tok_ADDX: return "ADDX";
+			case Tok_ALIGN: return "ALIGN";
 			case Tok_AND: return "AND";
 			case Tok_ANDI: return "ANDI";
 			case Tok_ASCII: return "ASCII";
@@ -86,6 +87,7 @@ namespace Asm {
 			case Tok_LEA: return "LEA";
 			case Tok_LINK: return "LINK";
 			case Tok_LIST: return "LIST";
+			case Tok_LONG: return "LONG";
 			case Tok_LSL: return "LSL";
 			case Tok_LSR: return "LSR";
 			case Tok_MACRO: return "MACRO";
@@ -108,6 +110,7 @@ namespace Asm {
 			case Tok_OR: return "OR";
 			case Tok_ORG: return "ORG";
 			case Tok_ORI: return "ORI";
+			case Tok_PAGE: return "PAGE";
 			case Tok_PATCHLIST: return "PATCHLIST";
 			case Tok_PEA: return "PEA";
 			case Tok_PROC: return "PROC";
@@ -180,6 +183,7 @@ namespace Asm {
 			case Tok_ADDI: return "Tok_ADDI";
 			case Tok_ADDQ: return "Tok_ADDQ";
 			case Tok_ADDX: return "Tok_ADDX";
+			case Tok_ALIGN: return "Tok_ALIGN";
 			case Tok_AND: return "Tok_AND";
 			case Tok_ANDI: return "Tok_ANDI";
 			case Tok_ASCII: return "Tok_ASCII";
@@ -237,6 +241,7 @@ namespace Asm {
 			case Tok_LEA: return "Tok_LEA";
 			case Tok_LINK: return "Tok_LINK";
 			case Tok_LIST: return "Tok_LIST";
+			case Tok_LONG: return "Tok_LONG";
 			case Tok_LSL: return "Tok_LSL";
 			case Tok_LSR: return "Tok_LSR";
 			case Tok_MACRO: return "Tok_MACRO";
@@ -259,6 +264,7 @@ namespace Asm {
 			case Tok_OR: return "Tok_OR";
 			case Tok_ORG: return "Tok_ORG";
 			case Tok_ORI: return "Tok_ORI";
+			case Tok_PAGE: return "Tok_PAGE";
 			case Tok_PATCHLIST: return "Tok_PATCHLIST";
 			case Tok_PEA: return "Tok_PEA";
 			case Tok_PROC: return "Tok_PROC";
@@ -393,6 +399,15 @@ namespace Asm {
 					default:
 						res = Tok_ADD; i += 3;
 						break;
+					}
+				}
+				break;
+			case 'L':
+				if( at(str,i+2) == 'I' ){
+					if( at(str,i+3) == 'G' ){
+						if( at(str,i+4) == 'N' ){
+							res = Tok_ALIGN; i += 5;
+						}
 					}
 				}
 				break;
@@ -737,6 +752,13 @@ namespace Asm {
 					break;
 				}
 				break;
+			case 'O':
+				if( at(str,i+2) == 'N' ){
+					if( at(str,i+3) == 'G' ){
+						res = Tok_LONG; i += 4;
+					}
+				}
+				break;
 			case 'S':
 				switch( at(str,i+2) ){
 				case 'L':
@@ -901,7 +923,13 @@ namespace Asm {
 		case 'P':
 			switch( at(str,i+1) ){
 			case 'A':
-				if( at(str,i+2) == 'T' ){
+				switch( at(str,i+2) ){
+				case 'G':
+					if( at(str,i+3) == 'E' ){
+						res = Tok_PAGE; i += 4;
+					}
+					break;
+				case 'T':
 					if( at(str,i+3) == 'C' ){
 						if( at(str,i+4) == 'H' ){
 							if( at(str,i+5) == 'L' ){
@@ -915,6 +943,7 @@ namespace Asm {
 							}
 						}
 					}
+					break;
 				}
 				break;
 			case 'E':

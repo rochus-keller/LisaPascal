@@ -16,5 +16,6 @@
         <file>images/category.png</file>
         <file>images/class.png</file>
         <file>images/source.png</file>
+        <file>images/assembler.png</file>
     </qresource>
 </RCC>

@@ -25,11 +25,11 @@
 
 namespace Lisa
 {
-    class Highlighter : public QSyntaxHighlighter
+    class PascalPainter : public QSyntaxHighlighter
     {
     public:
         enum { TokenProp = QTextFormat::UserProperty };
-        explicit Highlighter(QTextDocument *parent = 0);
+        explicit PascalPainter(QObject *parent = 0);
         void addBuiltIn(const QByteArray& bi);
         void addKeyword(const QByteArray& kw);
 
@@ -43,6 +43,18 @@ namespace Lisa
         enum Category { C_Num, C_Str, C_Kw, C_Type, C_Ident, C_Op, C_Pp, C_Cmt, C_Label, C_Max };
         QTextCharFormat d_format[C_Max];
         QSet<QByteArray> d_builtins, d_keywords;
+    };
+
+    class AsmPainter : public QSyntaxHighlighter
+    {
+    public:
+        AsmPainter(QObject* parent);
+
+        // overrides
+        void highlightBlock(const QString &text);
+    private:
+        enum Category { C_Num, C_Str, C_Kw, C_Ident, C_Op, C_Pp, C_Cmt, C_Label, C_Max };
+        QTextCharFormat d_format[C_Max];
     };
 
     class LogPainter : public QSyntaxHighlighter

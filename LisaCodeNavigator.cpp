@@ -95,7 +95,8 @@ public:
     ESL d_link, d_nonTerms, d_mutes, d_missing;
     CodeNavigator* d_that;
     Symbol* d_goto;
-    Highlighter* d_hl;
+    PascalPainter* d_hl1;
+    AsmPainter* d_hl2;
     QString d_find;
 
     Viewer(CodeNavigator* p):QPlainTextEdit(p),d_that(p),d_goto(0)
@@ -105,11 +106,12 @@ public:
         setTabStopWidth( 30 );
         setTabChangesFocus(true);
         setMouseTracking(true);
-        d_hl = new Highlighter( document() );
+        d_hl1 = new PascalPainter( this );
         foreach( const QString& w, s_builtIns )
-            d_hl->addBuiltIn(w.toUtf8());
+            d_hl1->addBuiltIn(w.toUtf8());
         foreach( const QByteArray& w, s_keywords )
-            d_hl->addKeyword(w);
+            d_hl1->addKeyword(w);
+        d_hl2 = new AsmPainter( this );
 
 #if defined(Q_OS_WIN32)
         QFont monospace("Consolas");
@@ -132,6 +134,11 @@ public:
         QFile in(d_path);
         if( !in.open(QIODevice::ReadOnly) )
             return false;
+        CodeFile* cf = that()->d_mdl->getCodeFile(path);
+        if( cf && ( cf->d_kind == Thing::Unit || cf->d_kind == Thing::Include ))
+            d_hl1->setDocument(document());
+        else if( cf && ( cf->d_kind == Thing::Assembler|| cf->d_kind == Thing::AsmIncl ) )
+            d_hl2->setDocument(document());
         QByteArray buf = in.readAll();
         buf.chop(1);
         setPlainText( QString::fromLatin1(buf) );
@@ -698,7 +705,14 @@ void CodeNavigator::syncModuleList()
         d_modules->setCurrentIndex(i);
         d_modules->scrollTo( i ,QAbstractItemView::EnsureVisible );
     }
-    d_mdl2->load( d_mdl->getUnitFile(d_view->d_path));
+    UnitFile* uf = d_mdl->getUnitFile(d_view->d_path);
+    if( uf )
+        d_mdl2->load( uf->d_intf, uf->d_impl );
+    else
+    {
+        AsmFile* af = d_mdl->getAsmFile(d_view->d_path);
+        d_mdl2->load( 0, af->d_impl );
+    }
     d_module->expandAll();
     d_module->scrollToTop();
 }
@@ -754,13 +768,14 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     {
         const IncludeFile* f = static_cast<const IncludeFile*>(nt);
         d_view->loadFile(f->d_file->d_realPath);
-    } 
-
-
-    if( nt->isDeclaration() )
+    }else if( nt->d_kind == Thing::Assembler )
     {
-        const Declaration* d = static_cast<const Declaration*>(nt);
-        d_view->setPosition( d->getLoc(), true, false );
+        const AsmFile* f = static_cast<const AsmFile*>(nt);
+        d_view->loadFile(f->d_file->d_realPath);
+    }else if( nt->d_kind == Thing::AsmIncl )
+    {
+        const AsmInclude* f = static_cast<const AsmInclude*>(nt);
+        d_view->loadFile(f->d_file->d_realPath);
     }
 }
 
@@ -891,7 +906,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.7.2");
+    a.setApplicationVersion("0.8.0");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

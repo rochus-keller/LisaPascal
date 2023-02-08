@@ -26,7 +26,7 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] resolve qualifiers by type for navigation of record fields
 - [x] precompiled binary versions for main platforms
 - [x] Module detail outline view
-- [ ] MC68000 assembler integrated with code model and symbol navigation
+- [x] MC68000 assembler integrated with code model and symbol navigation (Work in Progress)
 
 #### Features in evaluation
 

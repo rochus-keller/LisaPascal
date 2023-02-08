@@ -8,8 +8,11 @@
 program ::= { line }
 
 line ::= 
-	{ factor [addrop] [':']  // factor instead of ident to disambiguate with macrocall
+	{ term [size] [addrop] [':']  // term instead of ident to disambiguate with macrocall
+		// size because ident "E.TOP.S" in libpl-passet 403
 	| label [':']
+	| '#' expression // also this to simulate macrocall
+	| '-' addrop // dito
 	} 
 	[ directive 
 	| statement 
@@ -20,16 +23,17 @@ directive ::= ( // the lexer eats the dot prefix; the parser only sees the token
 	( PROC | FUNC ) ident [ ',' number ]
 	| ( DEF | REF ) ident { ',' ident }
 	| ( SEG | ASCII | TITLE ) ( string | substitute )
-	| ( END | ENDM | ELSE | ENDC | LIST | NOLIST |  MACROLIST | NOMACROLIST | PATCHLIST | NOPATCHLIST )
-	| ( BYTE | WORD ) expression { ',' expression }
-	| ( ORG | RORG | IF | EQU ) expression
+	| ( END | ENDM | ELSE | ENDC | LIST | NOLIST |  MACROLIST | NOMACROLIST 
+		| PATCHLIST | NOPATCHLIST | PAGE )
+	| ( BYTE | WORD | LONG ) expression { ',' expression }
+	| ( ORG | RORG | IF | EQU | ALIGN ) expression
 	| INCLUDE filename
 	| macrodef
 	)
 
 statement ::=
 	mnemonic [ size ] [ argument { ',' argument } ]
-	//| macrocall
+	//| macrocall // creates ambiguity with preceding idents, therefore simulated in line production
 
 mnemonic ::= 
 	BEQ | LSR | BNE | LSL | BGE | 'BLE' | 'DBF' | 'BMI' | 'ROR' | 'ASL' | 'ASR' | 'DBRA'
@@ -50,16 +54,19 @@ macrocall- ::= ident [ expression { ',' expression } ]
 
 argument ::=
 	\LA: 1:'-'&2:'('\  '-' addrop
-	| expression [ addrop ] 
+	| expression [size] [ addrop ] 
+		// size because ident "E.TOP.S" in libpl-passet 394
 	| '#' expression
 	| addrop
 	| label
 
-expression ::= ['-'] factor { op factor }
-
 addrop ::= '(' expression [ size ] [ ',' reg ] ')' [ '+' | size ] 
 
 reg ::= ident [ size ] | substitute
+
+expression ::= ['-'] term
+
+term ::= factor { \LL:2\ op factor }
 
 factor ::= ident | string | number | '<' expression '>' | substitute | '*'
 

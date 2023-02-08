@@ -20,6 +20,8 @@
 #include "LisaCodeModel.h"
 #include "LisaPpLexer.h"
 #include "LisaParser.h" 
+#include "AsmPpLexer.h"
+#include "AsmParser.h"
 #include <QFile>
 #include <QPixmap>
 #include <QtDebug>
@@ -28,7 +30,7 @@ using namespace Lisa;
 
 #define LISA_WITH_MISSING
 
-class CodeModelVisitor
+class PascalModelVisitor
 {
     CodeModel* d_mdl;
     UnitFile* d_cf;
@@ -44,7 +46,7 @@ class CodeModelVisitor
     QList<Declaration*> d_forwards;
 
 public:
-    CodeModelVisitor(CodeModel* m):d_mdl(m) {}
+    PascalModelVisitor(CodeModel* m):d_mdl(m) {}
 
     void visit( UnitFile* cf, SynTree* top )
     {      
@@ -1183,6 +1185,112 @@ private:
 protected:
 };
 
+class AsmModelVisitor
+{
+    CodeModel* d_mdl;
+    AsmFile* d_cf;
+
+public:
+    AsmModelVisitor(CodeModel* m):d_mdl(m) {}
+
+    void visit( AsmFile* cf, Asm::SynTree* top )
+    {
+        d_cf = cf;
+        cf->d_impl = new Scope();
+        cf->d_impl->d_kind = Thing::Body;
+        cf->d_impl->d_owner = cf;
+
+        foreach( Asm::SynTree* s, top->d_children )
+            if( s->d_tok.d_type == Asm::SynTree::R_line )
+                line(s);
+    }
+private:
+    void line(Asm::SynTree* st )
+    {
+        foreach( Asm::SynTree* s, st->d_children )
+            if( s->d_tok.d_type == Asm::SynTree::R_directive)
+                directive(s);
+    }
+    void directive(Asm::SynTree* st)
+    {
+        int type = 0;
+        foreach( Asm::SynTree* s, st->d_children )
+        {
+            if( s->d_tok.d_type == Asm::Tok_PROC)
+                type = Thing::Proc;
+            else if( s->d_tok.d_type == Asm::Tok_FUNC)
+                type = Thing::Func;
+            else if( s->d_tok.d_type == Asm::Tok_ident)
+            {
+                addDecl(s->d_tok, type );
+            }else if( s->d_tok.d_type == Asm::SynTree::R_filename)
+                include(s);
+        }
+        // TODO: .DEF apparently also declares proc names
+    }
+    void include(Asm::SynTree* st)
+    {
+        QStringList path;
+        int endCol = 0;
+        for( int i = 0; i < st->d_children.size(); i++ )
+            if( st->d_children[i]->d_tok.d_type == Asm::Tok_ident )
+            {
+                path.append( QString::fromUtf8(st->d_children[i]->d_tok.d_val).toLower() );
+                endCol = st->d_children[i]->d_tok.d_val.size() + st->d_children[i]->d_tok.d_colNr;
+            }
+        if( path.isEmpty() )
+            return;
+        QString fileName = path.last();
+        if( fileName.endsWith(".text") )
+            fileName.chop(5);
+        const FileSystem::File* found = 0;
+        // TODO: find can still be improved
+        if( path.size() == 1 )
+        {
+            found = d_mdl->getFs()->findFile(d_cf->d_file->d_dir, QString(), fileName);
+        }else if( path.size() == 2 )
+            found = d_mdl->getFs()->findFile(d_cf->d_file->d_dir, path[0], fileName);
+        else
+            // never seen so far
+            qWarning() << "asm include with more than two segments" << d_cf->d_file->getVirtualPath(false) << st->d_tok.d_lineNr;
+
+        AsmInclude* include = new AsmInclude();
+        d_cf->d_includes.append(include);
+        include->d_file = found;
+        include->d_len = endCol - st->d_tok.d_colNr;
+        include->d_col = st->d_tok.d_colNr;
+        include->d_row = st->d_tok.d_lineNr;
+        include->d_unit = d_cf;
+        if( found == 0 )
+        {
+            const QString line = QString("%1:%2:%3: cannot find assembler include file '%4'")
+                    .arg( d_cf->d_file->getVirtualPath(false) ).arg(include->d_col)
+                    .arg(include->d_row).arg(path.join('/'));
+            qCritical() << line.toUtf8().constData();
+        }
+    }
+    Declaration* addDecl(const Asm::Token& t, int type )
+    {
+        Declaration* d = new Declaration();
+        d->d_kind = type;
+        d->d_name = t.d_val;
+        d->d_id = Token::toId(t.d_val);
+        d->d_loc.d_pos = t.toLoc();
+        d->d_loc.d_filePath = t.d_sourcePath;
+        d->d_owner = d_cf->d_impl;
+        d_cf->d_impl->d_order.append(d);
+
+        Symbol* sy = new Symbol();
+        sy->d_loc = t.toLoc();
+        d_cf->d_syms[t.d_sourcePath].append(sy);
+        d->d_me = sy;
+        sy->d_decl = d;
+        d->d_refs[t.d_sourcePath].append(sy);
+
+        return d;
+    }
+};
+
 CodeModel::CodeModel(QObject *parent) : ItemModel(parent),d_sloc(0)
 {
     d_fs = new FileSystem(this);
@@ -1203,7 +1311,30 @@ bool CodeModel::load(const QString& rootDir)
     fillFolders(&d_root,&d_fs->getRoot(), &d_top, fileSlots);
     foreach( ModelItem* s, fileSlots )
     {
-        Q_ASSERT( s->d_thing && s->d_thing->d_kind == Thing::Unit);
+        Q_ASSERT( s->d_thing );
+        if( s->d_thing->d_kind != Thing::Assembler )
+            continue;
+        AsmFile* f = static_cast<AsmFile*>(s->d_thing);
+        Q_ASSERT( f->d_file );
+        parseAndResolve(f);
+        for( int i = 0; i < f->d_includes.size(); i++ )
+        {
+            AsmInclude* inc = f->d_includes[i];
+            if( inc->d_file != 0 )
+                new ModelItem(s, f->d_includes[i]);
+            Symbol* sym = new Symbol();
+            sym->d_decl = f->d_includes[i];
+            sym->d_loc = RowCol(inc->d_row,inc->d_col);
+            f->d_syms[f->d_file->d_realPath].append(sym);
+            if( inc->d_file )
+                d_map2[inc->d_file->d_realPath] = inc;
+        }
+    }
+    foreach( ModelItem* s, fileSlots )
+    {
+        Q_ASSERT( s->d_thing );
+        if( s->d_thing->d_kind != Thing::Unit )
+            continue;
         UnitFile* f = static_cast<UnitFile*>(s->d_thing);
         Q_ASSERT( f->d_file );
         parseAndResolve(f);
@@ -1243,12 +1374,20 @@ QVariant ItemModel::data(const QModelIndex& index, int role) const
 
 Symbol*CodeModel::findSymbolBySourcePos(const QString& path, int line, int col) const
 {
+    UnitFile::SymList syms;
+
     UnitFile* uf = getUnitFile(path);
     if( uf == 0 )
-        return 0;
+    {
+        AsmFile* af = getAsmFile(path);
+        if( af == 0 )
+            return 0;
+        syms = af->d_syms.value(path);
+    }else
+        syms = uf->d_syms.value(path);
+
 
     // TODO maybe make that faster by ordering by rowcol and e.g. binary search
-    const UnitFile::SymList& syms = uf->d_syms.value(path);
     foreach( Symbol* s, syms )
     {
         if( s->d_decl && s->d_loc.d_row == line &&
@@ -1272,10 +1411,26 @@ UnitFile*CodeModel::getUnitFile(const QString& path) const
         if( uf == 0 )
         {
             IncludeFile* inc = cf->toInclude();
-            Q_ASSERT(inc);
-            uf = inc->d_unit;
+            if( inc )
+                uf = inc->d_unit;
         }
-        Q_ASSERT(uf);
+        return uf;
+    }
+    return 0;
+}
+
+AsmFile*CodeModel::getAsmFile(const QString& path) const
+{
+    CodeFile* cf = d_map2.value(path);;
+    if( cf )
+    {
+        AsmFile* uf = cf->toAsmFile();
+        if( uf == 0 )
+        {
+            AsmInclude* inc = cf->toAsmInclude();
+            if( inc )
+                uf = inc->d_unit;
+        }
         return uf;
     }
     return 0;
@@ -1297,6 +1452,10 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
         {
         case Thing::Unit:
             return static_cast<UnitFile*>(s->d_thing)->d_file->d_name;
+        case Thing::Assembler:
+            return static_cast<AsmFile*>(s->d_thing)->d_file->d_name;
+        case Thing::AsmIncl:
+            return static_cast<AsmInclude*>(s->d_thing)->d_file->d_name;
         case Thing::Include:
             return static_cast<IncludeFile*>(s->d_thing)->d_file->d_name;
         case Thing::Folder:
@@ -1310,6 +1469,9 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
             return QPixmap(":/images/source.png");
         case Thing::Include:
             return QPixmap(":/images/include.png");
+        case Thing::Assembler:
+        case Thing::AsmIncl:
+            return QPixmap(":/images/assembler.png");
         case Thing::Folder:
             return QPixmap(":/images/folder.png");
         }
@@ -1328,6 +1490,10 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
                         .arg(cf->d_file->getVirtualPath())
                         .arg(cf->d_file->d_realPath);
             }
+        case Thing::Assembler:
+            return static_cast<AsmFile*>(s->d_thing)->d_file->d_realPath;
+        case Thing::AsmIncl:
+            return static_cast<AsmInclude*>(s->d_thing)->d_file->d_realPath;
         case Thing::Include:
             return static_cast<IncludeFile*>(s->d_thing)->d_file->d_realPath;
         }
@@ -1439,8 +1605,36 @@ void CodeModel::parseAndResolve(UnitFile* unit)
     for( QHash<QString,Ranges>::const_iterator i = lex.getMutes().begin(); i != lex.getMutes().end(); ++i )
         d_mutes.insert(i.key(),i.value());
 
-    CodeModelVisitor v(this);
+    PascalModelVisitor v(this);
     v.visit(unit,&p.d_root); // visit takes ~8% more time than just parsing
+
+    QCoreApplication::processEvents();
+}
+
+void CodeModel::parseAndResolve(AsmFile* unit)
+{
+    const_cast<FileSystem::File*>(unit->d_file)->d_parsed = true;
+    Asm::PpLexer lex(d_fs);
+    lex.reset(unit->d_file->d_realPath);
+    Asm::Parser p(&lex);
+    p.RunParser();
+    const int off = d_fs->getRootPath().size();
+    if( !p.errors.isEmpty() )
+    {
+        foreach( const Asm::Parser::Error& e, p.errors )
+        {
+            const FileSystem::File* f = d_fs->findFile(e.path);
+            const QString line = tr("%1:%2:%3: %4").arg( f ? f->getVirtualPath() : e.path.mid(off) ).arg(e.row)
+                    .arg(e.col).arg(e.msg);
+            qCritical() << line.toUtf8().constData();
+        }
+
+    }
+    d_sloc += lex.getSloc();
+
+    AsmModelVisitor v(this);
+    v.visit(unit,&p.d_root);
+
 
     QCoreApplication::processEvents();
 }
@@ -1488,13 +1682,21 @@ void CodeModel::fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeF
             top->d_files.append(f);
             ModelItem* s = new ModelItem(root,f);
             fileSlots.append(s);
+        }else if( super->d_files[i]->d_type == FileSystem::AsmUnit )
+        {
+            AsmFile* f = new AsmFile();
+            f->d_file = super->d_files[i];
+            //d_map1[f->d_file] = f;
+            d_map2[f->d_file->d_realPath] = f;
+            top->d_files.append(f);
+            ModelItem* s = new ModelItem(root,f);
+            fileSlots.append(s);
         }
     }
     std::sort( root->d_children.begin(), root->d_children.end(), ModelItem::lessThan );
-
 }
 
-QString UnitFile::getName() const
+QString CodeFile::getName() const
 {
     return d_file->d_name;
 }
@@ -1679,11 +1881,6 @@ FilePos IncludeFile::getLoc() const
     return FilePos( RowCol(1,1), d_file->d_realPath );
 }
 
-QString IncludeFile::getName() const
-{
-    return d_file->d_name;
-}
-
 QString Thing::getName() const
 {
     return QString();
@@ -1734,6 +1931,22 @@ IncludeFile*CodeFile::toInclude()
         return 0;
 }
 
+AsmFile*CodeFile::toAsmFile()
+{
+    if( d_kind == Assembler )
+        return static_cast<AsmFile*>(this);
+    else
+        return 0;
+}
+
+AsmInclude*CodeFile::toAsmInclude()
+{
+    if( d_kind == AsmIncl )
+        return static_cast<AsmInclude*>(this);
+    else
+        return 0;
+}
+
 CodeFile::~CodeFile()
 {
 }
@@ -1750,25 +1963,26 @@ ModuleDetailMdl::ModuleDetailMdl(QObject* parent)
 
 }
 
-void ModuleDetailMdl::load(UnitFile* uf)
+void ModuleDetailMdl::load(Scope* intf, Scope* impl)
 {
-    if( uf == 0 || d_uf == uf )
+    if( d_intf == intf && d_impl == impl )
         return;
 
     beginResetModel();
     d_root = ModelItem();
-    d_uf = uf;
+    d_intf = intf;
+    d_impl = impl;
 
-    if( d_uf->d_intf )
+    if( intf && impl )
     {
-        ModelItem* title = new ModelItem( &d_root, d_uf->d_intf );
-        fillItems(title, d_uf->d_intf);
+        ModelItem* title = new ModelItem( &d_root, intf );
+        fillItems(title, intf);
 
-        title = new ModelItem( &d_root, d_uf->d_impl );
-        fillItems(title, d_uf->d_impl);
+        title = new ModelItem( &d_root, impl );
+        fillItems(title, impl);
 
-    }else
-        fillItems(&d_root, d_uf->d_impl);
+    }else if( impl )
+        fillItems(&d_root, impl);
 
     endResetModel();
 }
@@ -1857,4 +2071,24 @@ void ModuleDetailMdl::fillSubs(ModelItem* parentItem, Scope* scope)
     std::sort( funcs.begin(), funcs.end(), DeclLessThan );
     for( int j = 0; j < funcs.size(); j++ )
         new ModelItem(parentItem,funcs[j]);
+}
+
+AsmFile::~AsmFile()
+{
+    if( d_impl )
+        delete d_impl;
+    QHash<QString,SymList>::const_iterator j;
+    for( j = d_syms.begin(); j != d_syms.end(); ++j )
+        for( int i = 0; i < j.value().size(); i++ )
+            delete j.value()[i];
+    for( int i = 0; i < d_includes.size(); i++ )
+        delete d_includes[i];
+}
+
+FilePos AsmInclude::getLoc() const
+{
+    if( d_file )
+        return FilePos( RowCol(d_row,d_col), d_file->d_realPath );
+    else
+        return FilePos();
 }

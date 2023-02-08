@@ -35,6 +35,11 @@ let exe ! : Executable {
 		./LisaToken.cpp 
 		./LisaFileSystem.cpp 
 		./LisaPpLexer.cpp
+		./AsmLexer.cpp
+		./AsmTokenType.cpp
+		./AsmParser.cpp
+    	./AsmPpLexer.cpp
+    	./AsmSynTree.cpp
 	]
 	.include_dirs += [ . .. ]
 	.deps += [ qt.copy_rcc qt.libqt run_rcc run_moc ]

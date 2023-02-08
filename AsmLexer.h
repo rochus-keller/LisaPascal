@@ -51,6 +51,8 @@ protected:
     Token string2();
     Token label();
     void countLine();
+    void readMacro();
+    QByteArray findMacro(const QByteArray&) const;
 private:
     QIODevice* d_in;
     QString d_filePath;
@@ -60,6 +62,7 @@ private:
     QList<Token> d_buffer;
     Token d_lastToken;
     quint32 d_sloc;
+    QList<QPair<QByteArray,QByteArray> > d_macro; // name (lower case) -> code
     bool d_ignoreComments;
     bool d_packComments;
     bool d_lineCounted;

@@ -15,7 +15,7 @@
 */
 
 #include "AsmLexer.h"
-
+#include <QtDebug>
 #include <QBuffer>
 using namespace Asm;
 
@@ -136,10 +136,10 @@ Token Lexer::nextTokenImp()
         {
             const char ch2 = lookAhead();
             if( ::isdigit(ch2) )
-                // TODO: we have to do this using a preprocessor and token substitution.
+                // NOTE: this is only seen in the highlighter; the parser only sees the instantiated macro;
                 // e.g. in libfp-x80arith.asm we see constructs like "#$%1", or in
                 // libfp-real.asm "add" is used as a macro argument.
-                // the present approach cannot solve this!
+                // the original assembler apparently substitutes on character level, not token level.
                 return token( Tok_substitute, 2, d_line.mid(d_colNr,2) );
             else
                 return ident(); // apparently idents can start with % too
@@ -263,10 +263,18 @@ Token Lexer::ident(bool dotPrefix)
     {
         const bool isDirective = Token::isDirective(t);
         if( !isDirective || ( dotPrefix && isDirective ) || ( !dotPrefix && t == Tok_EQU ) )
-            return token( t, off, QByteArray(), dotPrefix );
+        {
+            Token res = token( t, off, str, dotPrefix );
+            if( isDirective && t == Tok_MACRO )
+                readMacro();
+            return res;
+        }
     }
     // else
-    return token( Tok_ident, off, str, dotPrefix );
+    if( !findMacro( str ).isEmpty() )
+        return token( Tok_Comment, d_line.size() - d_colNr, str ); // just eat it
+    else
+        return token( Tok_ident, off, str, dotPrefix );
 }
 
 static inline bool isHexDigit( char c )
@@ -419,4 +427,46 @@ void Lexer::countLine()
     if( !d_lineCounted )
         d_sloc++;
     d_lineCounted = true;
+}
+
+void Lexer::readMacro()
+{
+    skipWhiteSpace();
+    Token name = ident(false);
+    QByteArray body;
+    while( !d_in->atEnd() )
+    {
+        const int pos = d_line.indexOf('.',d_colNr);
+        if( pos == -1 )
+        {
+            body += d_line.mid(d_colNr).trimmed();
+            nextLine();
+            body += '\n';
+        }else
+        {
+            const QByteArray keyword = d_line.mid(pos+1, 4).toUpper();
+            if( keyword == "ENDM" )
+            {
+                body += d_line.mid(d_colNr, pos - d_colNr).trimmed();
+                d_colNr = pos + 4;
+                countLine();
+                break;
+            }else
+            {
+                body += d_line.mid(d_colNr, pos - d_colNr + 1).trimmed();
+                d_colNr = pos + 1;
+            }
+        }
+    }
+    //qDebug() << "MACRO" << name.d_val << d_filePath << name.d_lineNr << body;
+    d_macro.append( qMakePair(name.d_val.toLower(),body) );
+}
+
+QByteArray Lexer::findMacro(const QByteArray& name) const
+{
+    QByteArray lc = name.toLower();
+    for(int i = 0; i < d_macro.size(); i++ ) // TODO more efficient
+        if( d_macro[i].first == lc )
+            return d_macro[i].second;
+    return QByteArray();
 }

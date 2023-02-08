@@ -21,10 +21,11 @@
 
 #include "LisaHighlighter.h"
 #include "LisaLexer.h"
+#include "AsmLexer.h"
 #include <QBuffer>
 using namespace Lisa;
 
-Highlighter::Highlighter(QTextDocument* parent) :
+PascalPainter::PascalPainter(QObject* parent) :
     QSyntaxHighlighter(parent)
 {
     for( int i = 0; i < C_Max; i++ )
@@ -49,22 +50,22 @@ Highlighter::Highlighter(QTextDocument* parent) :
     d_format[C_Label].setBackground(QColor(253, 217, 165));
 }
 
-void Highlighter::addBuiltIn(const QByteArray& bi)
+void PascalPainter::addBuiltIn(const QByteArray& bi)
 {
     d_builtins << bi;
 }
 
-void Highlighter::addKeyword(const QByteArray& kw)
+void PascalPainter::addKeyword(const QByteArray& kw)
 {
     d_keywords << kw;
 }
 
-QTextCharFormat Highlighter::formatForCategory(int c) const
+QTextCharFormat PascalPainter::formatForCategory(int c) const
 {
     return d_format[c];
 }
 
-void Highlighter::highlightBlock(const QString& text)
+void PascalPainter::highlightBlock(const QString& text)
 {
     const int previousBlockState_ = previousBlockState();
     int lexerState = 0, initialBraceDepth = 0;
@@ -213,4 +214,87 @@ void LogPainter::highlightBlock(const QString& text)
         c = Qt::red;
 
     setFormat( 0, text.size(), c );
+}
+
+
+AsmPainter::AsmPainter(QObject* parent):
+    QSyntaxHighlighter(parent)
+{
+    for( int i = 0; i < C_Max; i++ )
+    {
+        d_format[i].setFontWeight(QFont::Normal);
+        d_format[i].setForeground(Qt::black);
+        d_format[i].setBackground(Qt::transparent);
+    }
+    d_format[C_Num].setForeground(QColor(0, 153, 153));
+    d_format[C_Str].setForeground(QColor(208, 16, 64));
+    d_format[C_Cmt].setForeground(QColor(153, 153, 136));
+    d_format[C_Kw].setForeground(QColor(68, 85, 136));
+    d_format[C_Kw].setFontWeight(QFont::Bold);
+    d_format[C_Op].setForeground(QColor(153, 0, 0));
+    d_format[C_Op].setFontWeight(QFont::Bold);
+    d_format[C_Pp].setFontWeight(QFont::Bold);
+    d_format[C_Pp].setForeground(QColor(0, 128, 0));
+    d_format[C_Pp].setBackground(QColor(230, 255, 230));
+    d_format[C_Label].setForeground(QColor(251, 138, 0));
+    d_format[C_Label].setBackground(QColor(253, 237, 185));
+}
+
+void AsmPainter::highlightBlock(const QString& text)
+{
+    const int previousBlockState_ = previousBlockState();
+    int lexerState = 0, initialBraceDepth = 0;
+    if (previousBlockState_ != -1) {
+        lexerState = previousBlockState_ & 0xff;
+        initialBraceDepth = previousBlockState_ >> 8;
+    }
+
+    int braceDepth = initialBraceDepth;
+
+    Asm::Lexer lex;
+    lex.setIgnoreComments(false);
+
+    QList<Asm::Token> tokens = lex.tokens(text);
+    for( int i = 0; i < tokens.size(); ++i )
+    {
+        Asm::Token &t = tokens[i];
+        int len = t.d_val.size();
+
+        QTextCharFormat f;
+        if( t.d_type == Asm::Tok_Comment )
+            f = d_format[C_Cmt];
+        else if( t.d_type == Asm::Tok_string )
+            f = d_format[C_Str];
+        else if( t.d_type == Asm::Tok_number)
+            f = d_format[C_Num];
+        else if( t.d_type == Asm::Tok_label)
+            f = d_format[C_Label];
+        else if( t.d_type == Asm::Tok_dotB || t.d_type == Asm::Tok_dotS || t.d_type == Asm::Tok_dotW
+                 || t.d_type == Asm::Tok_dotL)
+            f = d_format[C_Kw];
+        else if( t.d_type == Asm::Tok_substitute)
+            f = d_format[C_Pp];
+        else if( Asm::tokenTypeIsLiteral(t.d_type) )
+            f = d_format[C_Op];
+        else if( Asm::tokenTypeIsKeyword(t.d_type) )
+        {
+            if( Asm::Token::isDirective(t.d_type))
+            {
+                f = d_format[C_Pp];
+                len++;
+            }else
+                f = d_format[C_Kw];
+        }else if( t.d_type == Tok_identifier )
+        {
+            if( i+1 < tokens.size() && tokens[i+1].d_type == Tok_Colon )
+                f = d_format[C_Label];
+            else
+                f = d_format[C_Ident];
+        }
+
+        if( f.isValid() )
+            setFormat( t.d_colNr-1, len, f );
+    }
+
+    setCurrentBlockState((braceDepth << 8) | lexerState );
 }
