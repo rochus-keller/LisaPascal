@@ -5,6 +5,8 @@
 
 #include <QByteArray>
 
+#define ASM_ASSUME_UNKNOWN_MACROS
+
 namespace Asm {
 	enum TokenType {
 		Tok_Invalid = 0,
@@ -150,6 +152,7 @@ namespace Asm {
 		Tok_WORD,
 
 		TT_Specials,
+		Tok_macrocall,
 		Tok_number,
 		Tok_string,
 		Tok_ident,

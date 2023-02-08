@@ -21,7 +21,8 @@ using namespace Asm;
 
 Lexer::Lexer():
     d_lastToken(Tok_Invalid),d_lineNr(0),d_colNr(0),d_in(0),
-    d_ignoreComments(true), d_packComments(true),d_sloc(0),d_lineCounted(false)
+    d_ignoreComments(true), d_packComments(true),d_sloc(0),d_lineCounted(false),
+    d_macros(0)
 {
 
 }
@@ -265,16 +266,34 @@ Token Lexer::ident(bool dotPrefix)
         if( !isDirective || ( dotPrefix && isDirective ) || ( !dotPrefix && t == Tok_EQU ) )
         {
             Token res = token( t, off, str, dotPrefix );
-            if( isDirective && t == Tok_MACRO )
-                readMacro();
+            if( d_macros && isDirective && t == Tok_MACRO )
+            {
+                Token name = readMacro();
+                d_buffer.append(name);
+                Token eol;
+                eol.d_type = Tok_eol;
+                eol.d_lineNr = name.d_lineNr;
+                eol.d_colNr = name.d_colNr + name.d_val.size();
+                eol.d_sourcePath = name.d_sourcePath;
+                d_buffer.append(eol);
+            }
             return res;
         }
     }
     // else
-    if( !findMacro( str ).isEmpty() )
-        return token( Tok_Comment, d_line.size() - d_colNr, str ); // just eat it
-    else
-        return token( Tok_ident, off, str, dotPrefix );
+    if( findMacro( str ) )
+    {
+        Token id = token( Asm::Tok_macrocall, off, str );
+        d_colNr = d_line.size(); // just eat arguments
+        Token eol;
+        eol.d_type = Tok_eol;
+        eol.d_lineNr = id.d_lineNr;
+        eol.d_colNr = d_colNr;
+        eol.d_sourcePath = id.d_sourcePath;
+        d_buffer.append(eol);
+        return id;
+    }else
+        return token( Tok_ident, off, str );
 }
 
 static inline bool isHexDigit( char c )
@@ -429,7 +448,7 @@ void Lexer::countLine()
     d_lineCounted = true;
 }
 
-void Lexer::readMacro()
+Token Lexer::readMacro()
 {
     skipWhiteSpace();
     Token name = ident(false);
@@ -459,14 +478,15 @@ void Lexer::readMacro()
         }
     }
     //qDebug() << "MACRO" << name.d_val << d_filePath << name.d_lineNr << body;
-    d_macro.append( qMakePair(name.d_val.toLower(),body) );
+    d_macros->insert( name.d_val.toLower(), Macro(name.d_val,body) );
+    return name;
 }
 
-QByteArray Lexer::findMacro(const QByteArray& name) const
+bool Lexer::findMacro(const QByteArray& name) const
 {
+    if( d_macros == 0 )
+        return false;
+
     QByteArray lc = name.toLower();
-    for(int i = 0; i < d_macro.size(); i++ ) // TODO more efficient
-        if( d_macro[i].first == lc )
-            return d_macro[i].second;
-    return QByteArray();
+    return d_macros->contains(lc);
 }

@@ -41,7 +41,7 @@ public:
         Dir* subdir(const QString& name) const;
         const File* file(const QString& name) const;
         const File* module(const QByteArray& nameLc) const;
-        Dir() {}
+        Dir():d_dir(0) {}
         ~Dir() { clear(); }
     };
 
@@ -70,6 +70,7 @@ public:
     const Dir& getRoot() const { return d_root; }
     const QString& getRootPath() const { return d_rootDir; }
     QList<const File*> getAllPas() const;
+    QList<const File*> getAllAsm() const;
     const File* findFile(const QString& realPath) const;
     const File* findFile(const Dir* startFrom, const QString& dir, const QString& name) const;
     const File* findModule(const Dir* startFrom, const QByteArray& nameLc) const;

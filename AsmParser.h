@@ -155,19 +155,20 @@ private:
 		_T_UNLK=137,
 		_T_WORD=138,
 		_T_Specials_=139,
-		_T_number=140,
-		_T_string=141,
-		_T_ident=142,
-		_T_substitute=143,
-		_T_label=144,
-		_T_Comment=145,
-		_T_eol=146,
-		_T_dotW=147,
-		_T_dotL=148,
-		_T_dotB=149,
-		_T_dotS=150,
-		_T_Eof=151,
-		_T_MaxToken_=152
+		_T_macrocall=140,
+		_T_number=141,
+		_T_string=142,
+		_T_ident=143,
+		_T_substitute=144,
+		_T_label=145,
+		_T_Comment=146,
+		_T_eol=147,
+		_T_dotW=148,
+		_T_dotL=149,
+		_T_dotB=150,
+		_T_dotS=151,
+		_T_Eof=152,
+		_T_MaxToken_=153
 	};
 	int maxT;
 

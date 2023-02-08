@@ -18,7 +18,6 @@ const char* SynTree::rToStr( quint16 r ) {
 		case R_factor: return "factor";
 		case R_filename: return "filename";
 		case R_line: return "line";
-		case R_macrocall_: return "macrocall";
 		case R_macrodef: return "macrodef";
 		case R_mnemonic: return "mnemonic";
 		case R_op: return "op";

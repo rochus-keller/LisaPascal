@@ -56,9 +56,7 @@ public:
 protected:
     Token nextTokenImp();
 
-    // TODO: implement preprocessor compatible with Assembler syntax
-    static PpSym checkPp(QByteArray&);
-    bool handleInclude(const QByteArray& data, const Token& t);
+    bool handleInclude(Token t);
     bool handleSetc(const QByteArray& data);
     bool handleIfc(const QByteArray& data);
     bool handleElsec();
@@ -117,6 +115,7 @@ private:
     QList<Include> d_includes;
     QHash<QString,Ranges> d_mutes;
     RowCol d_startMute;
+    Macros d_macros;
 };
 }
 

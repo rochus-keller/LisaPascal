@@ -20,11 +20,26 @@
 #include "AsmToken.h"
 
 #include <QList>
+#include <QHash>
 
 class QIODevice;
 
 namespace Asm
 {
+struct Macro
+{
+    QByteArray d_name;
+    QByteArray d_code;
+    Macro( const QByteArray& n, const QByteArray& c ):d_name(n),d_code(c){}
+    Macro(){}
+};
+
+class Macros : public QHash<QByteArray,Macro> // name (lower case) -> code
+{
+public:
+
+};
+
 class Lexer
 {
 public:
@@ -33,6 +48,8 @@ public:
     QIODevice* getDevice() const { return d_in; }
     void setIgnoreComments( bool b ) { d_ignoreComments = b; }
     void setPackComments( bool b ) { d_packComments = b; }
+    void setMacros( Macros* m ) { d_macros = m; }
+    const QString& getFilePath() const { return d_filePath; }
 
     Token nextToken();
     Token peekToken(quint8 lookAhead = 1);
@@ -51,8 +68,8 @@ protected:
     Token string2();
     Token label();
     void countLine();
-    void readMacro();
-    QByteArray findMacro(const QByteArray&) const;
+    Token readMacro();
+    bool findMacro(const QByteArray&) const;
 private:
     QIODevice* d_in;
     QString d_filePath;
@@ -62,7 +79,7 @@ private:
     QList<Token> d_buffer;
     Token d_lastToken;
     quint32 d_sloc;
-    QList<QPair<QByteArray,QByteArray> > d_macro; // name (lower case) -> code
+    Macros* d_macros;
     bool d_ignoreComments;
     bool d_packComments;
     bool d_lineCounted;

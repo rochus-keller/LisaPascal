@@ -1,4 +1,4 @@
-This is a parser for the Lisa Pascal dialect which I started to implement on January 22, 2023. The reason was that the Computer History Museum published the Apple Lisa source code on January 19, 2023 (see https://computerhistory.org/blog/the-lisa-apples-most-influential-failure/), and I was looking for a tool to study/analyze the code. 
+This is a parser and code navigator for the Lisa Pascal dialect and associated assembler which I started to implement on January 22, 2023. The reason was that the Computer History Museum published the Apple Lisa source code on January 19, 2023 (see https://computerhistory.org/blog/the-lisa-apples-most-influential-failure/), and I was looking for a tool to study/analyze the code. 
 
 Lisa Pascal was an extension to the Pascal used on the Apple II and III, but not yet object-oriented. I found a [specification of the language here](http://lisa.sunder.net/Pascal_Reference.pdf) which I used to implement the parser. During the project it turned out that also the Lisa OS source tree includes Clascal (~5%), i.e. not only the Lisa Toolkit, and that also a preprocessor had to be implemented to understand the code.
 
@@ -10,8 +10,9 @@ Cloc (http://cloc.sourceforge.net) counts 456 kSLOC, of which 408 kSLOC are Pasc
 
 #### Lisa Code Navigator
 
-[TBD]
 ![LisaCodeNavigator Screenshot](http://software.rochus-keller.ch/lisacodenavigator-0.6.3-screenshot.png)
+
+![LisaCodeNavigator Screenshot](http://software.rochus-keller.ch/lisacodenavigator-0.8.1-screenshot.png)
 
 #### Planned features
 
@@ -26,7 +27,7 @@ My primary goal was to implement tools as I did it e.g. for [Oberon](https://git
 - [x] resolve qualifiers by type for navigation of record fields
 - [x] precompiled binary versions for main platforms
 - [x] Module detail outline view
-- [x] MC68000 assembler integrated with code model and symbol navigation (Work in Progress)
+- [x] MC68000 assembler integrated with code model and symbol navigation
 
 #### Features in evaluation
 
@@ -61,6 +62,10 @@ After a lot of debugging and fixing source code navigation works as expected (be
 The indexer now considers the full syntax, including modules and imports, but qualifiers are not yet resolved.
 I also implemented internalized strings with comparisons by address instead of by string, and now indexing takes only ~8% more time than just parsing.
 There is now also a BUSY build file, see below how to use it.
+
+#### Status on February 8, 2023
+
+The MC68000 assembly language parser is implemented and integrated; Pascal procedures marked as external look for assembler implementations in the same virtual directory; the majority of names can be resolved that way (776 vs 534). I also implemented some convenience features like grayed-out sections in Pascal, sizable browser font, marks for unresoved symbols, and more Clascal support. With this release, all features planned so far have been implemented.
 
 #### Precompiled versions
 

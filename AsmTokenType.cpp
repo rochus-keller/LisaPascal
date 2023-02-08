@@ -141,6 +141,7 @@ namespace Asm {
 			case Tok_TST: return "TST";
 			case Tok_UNLK: return "UNLK";
 			case Tok_WORD: return "WORD";
+			case Tok_macrocall: return "macrocall";
 			case Tok_number: return "number";
 			case Tok_string: return "string";
 			case Tok_ident: return "ident";
@@ -295,6 +296,7 @@ namespace Asm {
 			case Tok_TST: return "Tok_TST";
 			case Tok_UNLK: return "Tok_UNLK";
 			case Tok_WORD: return "Tok_WORD";
+			case Tok_macrocall: return "Tok_macrocall";
 			case Tok_number: return "Tok_number";
 			case Tok_string: return "Tok_string";
 			case Tok_ident: return "Tok_ident";

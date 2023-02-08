@@ -21,6 +21,37 @@
 #include <QFile>
 #include <QtDebug>
 
+static void dump(QTextStream& out, const Asm::SynTree* node, int level)
+{
+    QByteArray str;
+    if( node->d_tok.d_type == Asm::Tok_Invalid )
+        level--;
+    else if( node->d_tok.d_type < Asm::SynTree::R_First )
+    {
+        if( Asm::tokenTypeIsKeyword( node->d_tok.d_type ) )
+            str = Asm::tokenTypeString(node->d_tok.d_type);
+        else if( node->d_tok.d_type > Asm::TT_Specials )
+            str = QByteArray("\"") + node->d_tok.d_val + QByteArray("\"");
+        else
+            str = QByteArray("\"") + Asm::tokenTypeString(node->d_tok.d_type) + QByteArray("\"");
+
+    }else
+        str = Asm::SynTree::rToStr( node->d_tok.d_type );
+    if( !str.isEmpty() )
+    {
+        str += QByteArray("\t") + QFileInfo(node->d_tok.d_sourcePath).baseName().toUtf8() +
+                ":" + QByteArray::number(node->d_tok.d_lineNr) +
+                ":" + QByteArray::number(node->d_tok.d_colNr);
+        QByteArray ws;
+        for( int i = 0; i < level; i++ )
+            ws += "|  ";
+        str = ws + str;
+        out << str.data() << endl;
+    }
+    foreach( Asm::SynTree* sub, node->d_children )
+        dump( out, sub, level + 1 );
+}
+
 QStringList collectFiles( const QDir& dir, const QStringList& suffix )
 {
     QStringList res;
@@ -44,6 +75,7 @@ int main(int argc, char *argv[])
     if( a.arguments().size() <= 1 )
         return -1;
 
+#if 0
     QStringList files;
 
     if( QFileInfo(a.arguments()[1]).isDir() )
@@ -51,13 +83,9 @@ int main(int argc, char *argv[])
     else
         files << a.arguments()[1];
 
-    Lisa::FileSystem fs;
-    fs.addToRoot(files);
-
     int ok = 0;
     foreach( const QString& file, files )
     {
-#if 0
         qDebug() << "***** lexing" << file;
         Asm::Lexer lex;
         //lex.setIgnoreComments(false);
@@ -86,24 +114,37 @@ int main(int argc, char *argv[])
             qCritical() << t.d_sourcePath << t.d_lineNr << t.d_colNr << t.d_val;
             return -1;
         }
+    }
 #else
+    Lisa::FileSystem fs;
+    fs.load(a.arguments()[1]);
+    QList<const Lisa::FileSystem::File*> files = fs.getAllAsm();
+    int ok = 0;
+    foreach( const Lisa::FileSystem::File* f, files )
+    {
         Asm::PpLexer lex(&fs);
-        lex.reset(file);
+        lex.reset(f->d_realPath);
         Asm::Parser p(&lex);
         //qDebug() << "**** parsing" << file;
         p.RunParser();
         if( !p.errors.isEmpty() )
         {
             foreach( const Asm::Parser::Error& e, p.errors )
-                qCritical() << file << e.row << e.col << e.msg;
+                qCritical() << f->getVirtualPath() << e.row << e.col << e.msg;
 
         }else
         {
             ok++;
             //qDebug() << "ok";
         }
+#if 0
+        QFile out(f->d_realPath + ".st");
+        out.open(QIODevice::WriteOnly);
+        QTextStream s(&out);
+        dump(s,&p.d_root,0);
 #endif
     }
+#endif
     qDebug() << "#### finished with" << ok << "files ok of total" << files.size() << "files";
 
     return 0;

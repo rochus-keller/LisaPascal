@@ -36,7 +36,8 @@ class Thing
 {
 public:
     enum Kind { Undefined,
-       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, MethBlock, Label, Param, Field, Module, Self,
+       /* Declaration: */ Const, TypeDecl, Var, Func, Proc, AsmDef, MethBlock, Label, Param, Field,
+                            Module, AsmRef, AsmMacro, Self,
        /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
        /* AsmFile: */ Assembler,
@@ -123,11 +124,13 @@ class IncludeFile;
 class UnitFile;
 class AsmFile;
 class AsmInclude;
+class CodeFolder;
 
 class CodeFile : public Thing
 {
 public:
     const FileSystem::File* d_file;
+    CodeFolder* d_folder;
 
     UnitFile* toUnit();
     IncludeFile* toInclude();
@@ -136,7 +139,7 @@ public:
 
     QString getName() const;
     const FileSystem::File* getFile() const { return d_file; }
-    CodeFile():d_file(0) {}
+    CodeFile():d_file(0),d_folder(0) {}
     ~CodeFile();
 };
 

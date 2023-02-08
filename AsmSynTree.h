@@ -19,7 +19,6 @@ namespace Asm {
 			R_factor,
 			R_filename,
 			R_line,
-			R_macrocall_,
 			R_macrodef,
 			R_mnemonic,
 			R_op,

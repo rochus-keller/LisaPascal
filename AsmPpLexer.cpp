@@ -54,6 +54,7 @@ bool PpLexer::reset(const QString& filePath)
         return false;
     }
     d_stack.back().d_lex.setStream(file,filePath);
+    d_stack.back().d_lex.setMacros(&d_macros);
     return true;
 }
 
@@ -89,7 +90,6 @@ Token PpLexer::nextTokenImp()
     Token t = d_stack.back().d_lex.nextToken();
     while( t.d_type == Tok_Comment || t.d_type == Tok_Eof )
     {
-        const bool statusBefore = ppthis().open;
         if( t.d_type == Tok_Eof )
         {
             d_files.removeAll(d_stack.back().d_lex.getDevice());
@@ -100,158 +100,58 @@ Token PpLexer::nextTokenImp()
             if( d_stack.isEmpty() )
                 return Token(Tok_Eof);
         }
-        if( t.d_type == Tok_Comment && ( t.d_val.startsWith("{$") || t.d_val.startsWith("(*$") ) )
+        t = d_stack.back().d_lex.nextToken();
+    }
+    while( t.d_type == Tok_INCLUDE )
+    {
+        if( !handleInclude(t) )
         {
-            QByteArray data = t.d_val;
-            const PpSym sym = checkPp(data);
-            bool ok = true;
-            if( sym == PpIncl )
-                ok = handleInclude(data,t);
-            else if( sym == PpSetc )
-                ok = handleSetc(data);
-            else if( sym == PpIfc )
-                ok = handleIfc(data);
-            else if( sym == PpElsec )
-                ok = handleElsec();
-            else if( sym == PpEndc )
-                ok = handleEndc();
-            if( !ok )
-            {
-                Token err(Tok_Invalid,t.d_lineNr,t.d_colNr,d_err.toUtf8());
-                err.d_sourcePath = t.d_sourcePath;
-                return err;
-            }
-        }
-        const bool statusAfter = ppthis().open;
-        if( statusBefore != statusAfter )
-        {
-            if( !ppthis().open )
-            {
-                d_startMute = t.toLoc();
-                d_startMute.d_col += t.d_val.size();
-            }else
-                d_stack.back().d_mutes.append(qMakePair(d_startMute,t.toLoc()));
-        }
-        if( !ppthis().open )
-        {
-            t = d_stack.back().d_lex.peekToken();
-            while( t.d_type != Tok_Comment && t.d_type != Tok_Eof )
-            {
-                t = d_stack.back().d_lex.nextToken();
-                t = d_stack.back().d_lex.peekToken();
-            }
+            Token err(Tok_Invalid,t.d_lineNr,t.d_colNr,d_err.toUtf8());
+            err.d_sourcePath = t.d_sourcePath;
+            return err;
         }
         t = d_stack.back().d_lex.nextToken();
     }
     return t;
 }
 
-class PpMiniLex
+bool PpLexer::handleInclude(Token t)
 {
-public:
-    PpMiniLex(const QByteArray& str):d_pos(0),d_str(str){}
-    char next()
-    {
-        if( d_pos < d_str.size() )
-            return ::tolower(d_str[d_pos++]);
-        else
-            return 0;
-    }
-    int getPos() const { return d_pos; }
-private:
-    QByteArray d_str;
-    int d_pos;
-};
-
-static PpLexer::PpSym decodePp( PpMiniLex& lex )
-{
-    char ch;
-    switch( lex.next() )
-    {
-    case 'i':
-        ch = lex.next();
-        if( ::isspace(ch) )
-            return PpLexer::PpIncl;
-        else if( ch == 'f' )
-            if( lex.next() == 'c' )
-                return PpLexer::PpIfc;
-        break;
-    case 'e':
-        switch( lex.next() )
-        {
-        case 'l':
-            if( lex.next() == 's' )
-                if( lex.next() == 'e' )
-                    if( lex.next() == 'c' )
-                        return PpLexer::PpElsec;
-            break;
-        case 'n':
-            if( lex.next() == 'd' )
-                if( lex.next() == 'c' )
-                    return PpLexer::PpEndc;
-            break;
-        }
-        break;
-    case 's':
-        if( lex.next() == 'e' )
-            if( lex.next() == 't' )
-                if( lex.next() == 'c' )
-                    return PpLexer::PpSetc;
-        break;
-    }
-    return PpLexer::PpNone;
-}
-
-PpLexer::PpSym PpLexer::checkPp(QByteArray& str)
-{
-    PpSym res = PpNone;
-    PpMiniLex lex(str);
-    switch( lex.next() )
-    {
-    case '{':
-        if( lex.next() == '$' )
-        {
-            res = decodePp(lex);
-            str = str.mid(lex.getPos(), str.size() - lex.getPos() - 1);
-        }
-        break;
-    case '(':
-        if( lex.next() == '*' )
-            if( lex.next() == '$' )
-            {
-                res = decodePp(lex);
-                str = str.mid(lex.getPos(), str.size() - lex.getPos() - 2);
-            }
-        break;
-    }
-    return res;
-}
-
-bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
-{
-    QString path = QString::fromUtf8(data).trimmed().toLower();
-    if( path.endsWith(".text") )
-        path.chop(5);
     const FileSystem::File* f = d_fs->findFile(t.d_sourcePath);
     Q_ASSERT( f );
-    QStringList pathFile = path.split('/');
-    const FileSystem::File* found = 0;
-    if( pathFile.size() == 1 )
+
+    QStringList path;
+    int line = t.d_lineNr, startCol = 0, endCol = 0;
+    while( t.isValid() && t.d_type != Tok_eol )
     {
-        QString name = pathFile[0];
-        const int colon = name.indexOf(':');
-        if( colon != -1 )
-            name = name.mid(colon+1);
-        found = d_fs->findFile(f->d_dir, QString(), name);
-    }else if( pathFile.size() == 2 )
-        found = d_fs->findFile(f->d_dir, pathFile[0], pathFile[1]);
+        t = d_stack.back().d_lex.nextToken();
+        if( t.d_type == Tok_ident )
+        {
+            if( startCol == 0 )
+                startCol = t.d_colNr;
+            path.append( QString::fromUtf8(t.d_val).toLower() );
+            endCol = t.d_val.size() + t.d_colNr;
+        }
+    }
+
+    QString fileName = path.last();
+    if( fileName.endsWith(".text") )
+        fileName.chop(5);
+    const FileSystem::File* found = 0;
+    // TODO: find can still be improved
+    if( path.size() == 1 )
+    {
+        found = d_fs->findFile(f->d_dir, QString(), fileName);
+    }else if( path.size() == 2 )
+        found = d_fs->findFile(f->d_dir, path[0], fileName);
 
     Include inc;
     inc.d_inc = found;
-    inc.d_loc = t.toLoc();
+    inc.d_loc = RowCol(line,startCol);
     inc.d_sourcePath = t.d_sourcePath;
-    inc.d_len = t.d_val.size();
+    inc.d_len = endCol - startCol;
     d_includes.append(inc);
+    d_err.clear();
     if( found )
     {
         d_stack.push_back(Level());
@@ -260,12 +160,14 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
         {
             delete file;
             d_stack.pop_back();
-            d_err = QString("file '%1' cannot be opened").arg(data.constData()).toUtf8();
-            return false;
+            d_err = QString("file '%1' cannot be opened").arg(path.join('/')).toUtf8();
+        }else
+        {
+            d_stack.back().d_lex.setStream(file,found->d_realPath);
+            d_stack.back().d_lex.setMacros(&d_macros);
         }
-        d_stack.back().d_lex.setStream(file,found->d_realPath);
     }else
-        d_err = QString("include file '%1' not found").arg(data.constData()).toUtf8();
+        d_err = QString("assembler include file '%1' not found").arg(path.join('/')).toUtf8();
     return found;
 }
 

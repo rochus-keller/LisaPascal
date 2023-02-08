@@ -718,20 +718,62 @@ private:
                 func_proc_declaration(scope,s, Thing::Func);
         }
     }
+    enum Attr { NoAttr, ForwardAttr, ExternalAttr };
     void func_proc_declaration(Scope* scope, SynTree* st, int kind)
     {
         Declaration* d = 0;
-        bool forward = false;
+        Attr attr = NoAttr;
+        SynTree* body = 0;
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_procedure_heading ||
                     s->d_tok.d_type == SynTree::R_function_heading )
                 d = func_proc_heading(scope,s,kind); // overwrite the scope for the body
             else if( s->d_tok.d_type == SynTree::R_body_)
-                forward = body_( d ? d->d_body : scope,s);
+            {
+                body = s;
+                attr = body_( d ? d->d_body : scope,s);
+            }
         }
-        if( forward && d )
+        if( attr == ForwardAttr && d )
             d_forwards.append(d);
+        else if( attr == ExternalAttr && d )
+            linkToAsm(d, body);
+    }
+    Declaration* findAsm(const char* id)
+    {
+        CodeFolder* dir = d_cf->d_folder;
+        if( dir == 0 )
+            return 0;
+        foreach( CodeFile* f, dir->d_files )
+        {
+            if( f->d_kind == Thing::Assembler )
+            {
+                AsmFile* af = static_cast<AsmFile*>(f);
+                Q_ASSERT( af->d_impl );
+                foreach( Declaration* d, af->d_impl->d_order )
+                {
+                    if( ( d->d_kind == Thing::Func || d->d_kind == Thing::Proc || d->d_kind == Thing::AsmDef )
+                            && d->d_id == id )
+                        return d;
+                }
+            }
+        }
+        return 0;
+    }
+    void linkToAsm(Declaration* d, SynTree* body)
+    {
+        Declaration* ext = findAsm(d->d_id);
+        foreach( SynTree* s, body->d_children )
+            if( s->d_tok.d_type == Tok_external )
+            {
+                Symbol* sy = new Symbol();
+                sy->d_loc = s->d_tok.toLoc();
+                d_cf->d_syms[s->d_tok.d_sourcePath].append(sy);
+                sy->d_decl = ext;
+                if( ext )
+                    ext->d_refs[s->d_tok.d_sourcePath].append(sy);
+            }
     }
     Declaration* func_proc_heading(Scope* scope, SynTree* st, int type)
     {
@@ -841,9 +883,9 @@ private:
         }
         return t;
     }
-    bool body_(Scope* scope, SynTree* st)
+    Attr body_(Scope* scope, SynTree* st)
     {
-        bool forward = false;
+        Attr res = NoAttr;
         foreach( SynTree* s, st->d_children )
         {
             if( s->d_tok.d_type == SynTree::R_block)
@@ -853,9 +895,11 @@ private:
             if( s->d_tok.d_type == SynTree::R_constant)
                 constant(scope,s);
             if( s->d_tok.d_type == Tok_forward )
-                forward = true;
+                res = ForwardAttr;
+            if( s->d_tok.d_type == Tok_external )
+                res = ExternalAttr;
         }
-        return forward;
+        return res;
     }
     void statement_part( Scope* scope, SynTree* st)
     {
@@ -1200,16 +1244,58 @@ public:
         cf->d_impl->d_kind = Thing::Body;
         cf->d_impl->d_owner = cf;
 
+        // make two passes. First get all labels
+        foreach( Asm::SynTree* s, top->d_children )
+            collectLabels(s);
+
         foreach( Asm::SynTree* s, top->d_children )
             if( s->d_tok.d_type == Asm::SynTree::R_line )
                 line(s);
     }
 private:
+    void collectLabels(Asm::SynTree* st)
+    {
+        foreach( Asm::SynTree* s, st->d_children )
+        {
+            switch(s->d_tok.d_type)
+            {
+            case Asm::SynTree::R_term:
+            case Asm::SynTree::R_factor:
+                collectLabels(s);
+                break;
+            case Asm::Tok_label:
+                addDecl(s->d_tok,Thing::Label);
+                break;
+            case Asm::Tok_ident:
+                addDecl(s->d_tok,Thing::Label);
+                break;
+            }
+        }
+    }
+    Symbol* addSym(const Asm::Token& t)
+    {
+        Declaration* d = d_cf->d_impl->findDecl(Token::toId(t.d_val));
+        Symbol* sy = 0;
+        if( d )
+        {
+            sy = new Symbol();
+            sy->d_loc = t.toLoc();
+            d_cf->d_syms[t.d_sourcePath].append(sy);
+            sy->d_decl = d;
+            if( d )
+                d->d_refs[t.d_sourcePath].append(sy);
+        }
+        return sy;
+    }
     void line(Asm::SynTree* st )
     {
         foreach( Asm::SynTree* s, st->d_children )
+        {
             if( s->d_tok.d_type == Asm::SynTree::R_directive)
                 directive(s);
+            else if( s->d_tok.d_type == Asm::SynTree::R_statement)
+                collectSymbols(s);
+        }
     }
     void directive(Asm::SynTree* st)
     {
@@ -1220,16 +1306,58 @@ private:
                 type = Thing::Proc;
             else if( s->d_tok.d_type == Asm::Tok_FUNC)
                 type = Thing::Func;
+            else if( s->d_tok.d_type == Asm::Tok_DEF)
+                type = Thing::Label;
+            else if( s->d_tok.d_type == Asm::Tok_REF)
+                type = Thing::AsmRef;
             else if( s->d_tok.d_type == Asm::Tok_ident)
             {
-                addDecl(s->d_tok, type );
+                if( type == Thing::Label )
+                {
+                    Symbol* sy = addSym(s->d_tok);
+                    if( sy && sy->d_decl)
+                        sy->d_decl->d_kind = Thing::AsmDef;
+                }else
+                    addDecl(s->d_tok, type );
             }else if( s->d_tok.d_type == Asm::SynTree::R_filename)
                 include(s);
+            else if( s->d_tok.d_type == Asm::SynTree::R_expression)
+                collectSymbols(s);
+            else if( s->d_tok.d_type == Asm::SynTree::R_macrodef)
+                macrodef(s);
         }
-        // TODO: .DEF apparently also declares proc names
+    }
+    void macrodef(Asm::SynTree* st)
+    {
+        foreach( Asm::SynTree* s, st->d_children )
+            if( s->d_tok.d_type == Asm::Tok_ident)
+                addDecl(s->d_tok, Thing::AsmMacro );
+    }
+    void collectSymbols(Asm::SynTree* st)
+    {
+        foreach( Asm::SynTree* s, st->d_children )
+        {
+            switch(s->d_tok.d_type)
+            {
+            case Asm::SynTree::R_argument:
+            case Asm::SynTree::R_addrop:
+            case Asm::SynTree::R_expression:
+            case Asm::SynTree::R_term:
+            case Asm::SynTree::R_factor:
+                collectSymbols(s);
+                break;
+            case Asm::Tok_label:
+            case Asm::Tok_ident:
+            case Asm::Tok_macrocall:
+                addSym(s->d_tok);
+                break;
+            }
+        }
     }
     void include(Asm::SynTree* st)
     {
+#if 0
+        // no longer needed since AsmPpLexer already has includes list
         QStringList path;
         int endCol = 0;
         for( int i = 0; i < st->d_children.size(); i++ )
@@ -1261,6 +1389,7 @@ private:
         include->d_col = st->d_tok.d_colNr;
         include->d_row = st->d_tok.d_lineNr;
         include->d_unit = d_cf;
+        include->d_folder = d_cf->d_folder;
         if( found == 0 )
         {
             const QString line = QString("%1:%2:%3: cannot find assembler include file '%4'")
@@ -1268,6 +1397,7 @@ private:
                     .arg(include->d_row).arg(path.join('/'));
             qCritical() << line.toUtf8().constData();
         }
+#endif
     }
     Declaration* addDecl(const Asm::Token& t, int type )
     {
@@ -1593,6 +1723,7 @@ void CodeModel::parseAndResolve(UnitFile* unit)
         inc->d_file = f.d_inc;
         inc->d_len = f.d_len;
         inc->d_unit = unit;
+        inc->d_folder = unit->d_folder;
         Symbol* sym = new Symbol();
         sym->d_decl = inc;
         sym->d_loc = f.d_loc;
@@ -1629,6 +1760,21 @@ void CodeModel::parseAndResolve(AsmFile* unit)
             qCritical() << line.toUtf8().constData();
         }
 
+    }
+    foreach( const Asm::PpLexer::Include& f, lex.getIncludes() )
+    {
+        AsmInclude* inc = new AsmInclude();
+        inc->d_file = f.d_inc;
+        inc->d_len = f.d_len;
+        inc->d_unit = unit;
+        inc->d_folder = unit->d_folder;
+        Symbol* sym = new Symbol();
+        sym->d_decl = inc;
+        sym->d_loc = f.d_loc;
+        unit->d_syms[f.d_sourcePath].append(sym);
+        if( f.d_inc )
+            d_map2[f.d_inc->d_realPath] = inc;
+        unit->d_includes.append(inc);
     }
     d_sloc += lex.getSloc();
 
@@ -1677,6 +1823,7 @@ void CodeModel::fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeF
         {
             UnitFile* f = new UnitFile();
             f->d_file = super->d_files[i];
+            f->d_folder = top;
             d_map1[f->d_file] = f;
             d_map2[f->d_file->d_realPath] = f;
             top->d_files.append(f);
@@ -1686,6 +1833,7 @@ void CodeModel::fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeF
         {
             AsmFile* f = new AsmFile();
             f->d_file = super->d_files[i];
+            f->d_folder = top;
             //d_map1[f->d_file] = f;
             d_map2[f->d_file->d_realPath] = f;
             top->d_files.append(f);
@@ -1783,7 +1931,7 @@ UnitFile*Scope::getUnitFile() const
         Q_ASSERT( d->d_owner != 0 );
         return d->d_owner->getUnitFile();
     }else
-        Q_ASSERT(false);
+        return 0; // happens in assembler
 }
 
 Declaration*Scope::findDecl(const char* id, bool withImports) const
@@ -1906,6 +2054,8 @@ const char*Thing::typeName() const
         return "Parameter";
     case Field:
         return "Field";
+    case Label:
+        return "Label";
     default:
         return "";
     }
@@ -2022,6 +2172,7 @@ QVariant ModuleDetailMdl::data(const QModelIndex& index, int role) const
         case Thing::Proc:
             return QPixmap(":/images/procedure.png");
         case Thing::Label:
+        case Thing::AsmDef:
             return QPixmap(":/images/label.png");
         case Thing::MethBlock:
             return QPixmap(":/images/category.png");

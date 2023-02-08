@@ -18,7 +18,9 @@ SOURCES += main.cpp \
     Converter.cpp \
     LisaFileSystem.cpp \
     LisaPpLexer.cpp \
-    LisaToken.cpp
+    LisaToken.cpp \
+    AsmLexer.cpp \
+    AsmTokenType.cpp
 
 HEADERS += \
     LisaLexer.h \
@@ -28,4 +30,6 @@ HEADERS += \
     LisaTokenType.h \
     Converter.h \
     LisaFileSystem.h \
-    LisaPpLexer.h
+    LisaPpLexer.h \
+    AsmLexer.h \
+    AsmTokenType.h

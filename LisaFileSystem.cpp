@@ -209,6 +209,22 @@ QList<const FileSystem::File*> FileSystem::getAllPas() const
     return res;
 }
 
+static void walkForAsm(const FileSystem::Dir* d, QList<const FileSystem::File*>& res )
+{
+    for( int i = 0; i < d->d_subdirs.size(); i++ )
+        walkForAsm( d->d_subdirs[i], res );
+    for( int i = 0; i < d->d_files.size(); i++ )
+        if( d->d_files[i]->d_type == FileSystem::AsmUnit )
+            res.append(d->d_files[i]);
+}
+
+QList<const FileSystem::File*> FileSystem::getAllAsm() const
+{
+    QList<const FileSystem::File*> res;
+    walkForAsm(&d_root,res);
+    return res;
+}
+
 const FileSystem::File*FileSystem::findFile(const QString& realPath) const
 {
     return d_fileMap.value(realPath);
@@ -219,10 +235,20 @@ const FileSystem::File*FileSystem::findFile(const Dir* startFrom, const QString&
     Q_ASSERT(startFrom);
     const File* res = 0;
     const Dir* d = startFrom;
-    if( res == 0 && d )
+    while( res == 0 && d )
     {
         if( dir.isEmpty() || d->d_name == dir )
             res = d->file(name);
+        if( res == 0 && !dir.isEmpty() )
+        {
+            for( int i = 0; i < d->d_subdirs.size(); i++ )
+            {
+                if( d->d_subdirs[i]->d_name == dir )
+                    res = d->d_subdirs[i]->file(name);
+                if( res )
+                    break;
+            }
+        }
         d = d->d_dir;
     }
     return res;
@@ -395,7 +421,7 @@ static const char* typeName(int t)
     case FileSystem::PascalUnit:
         return ".pas";
     case FileSystem::PascalFragment:
-        return ".inc";
+        return ".pas";
     case FileSystem::AsmFragment:
     case FileSystem::AsmUnit:
         return ".asm";

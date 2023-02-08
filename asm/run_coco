@@ -8,3 +8,5 @@ mv ./AsmSynTree.cpp ..
 
 mv ./AsmTokenType.h ..
 mv ./AsmTokenType.cpp ..
+
+rm ./LisaAsm.atg

@@ -5,15 +5,21 @@
 // "Programming the 68000 - Macintosh Assembly Language" (1986), and then modified
 // until all assembler source files of the Lisa Source Code published by the CHM parsed without error
 
+#define ASSUME_UNKNOWN_MACROS
+
 program ::= { line }
 
 line ::= 
-	{ term [size] [addrop] [':']  // term instead of ident to disambiguate with macrocall
+#ifdef ASSUME_UNKNOWN_MACROS
+	{ term [size] [addrop] [':']  // term instead of ident to disambiguate with original macrocall
 		// size because ident "E.TOP.S" in libpl-passet 403
 	| label [':']
 	| '#' expression // also this to simulate macrocall
 	| '-' addrop // dito
 	} 
+#else
+	{ ident [':'] | label [':'] }
+#endif
 	[ directive 
 	| statement 
 	| ',' argument { ',' argument }  // instead of macrocall
@@ -33,7 +39,7 @@ directive ::= ( // the lexer eats the dot prefix; the parser only sees the token
 
 statement ::=
 	mnemonic [ size ] [ argument { ',' argument } ]
-	//| macrocall // creates ambiguity with preceding idents, therefore simulated in line production
+	| macrocall 
 
 mnemonic ::= 
 	BEQ | LSR | BNE | LSL | BGE | 'BLE' | 'DBF' | 'BMI' | 'ROR' | 'ASL' | 'ASR' | 'DBRA'
@@ -48,9 +54,11 @@ mnemonic ::=
 
 size ::= dotW | dotL | dotB | dotS
 
-macrodef ::= MACRO ident [ '(' [ ident { ',' ident } ] ')' ]
+macrodef ::= MACRO ident 
 
-macrocall- ::= ident [ expression { ',' expression } ]
+// macrocall- ::= ident [ expression { ',' expression } ]
+// creates ambiguity with preceding idents, therefore simulated in line production
+macrocall ::= // just an empty symbol
 
 argument ::=
 	\LA: 1:'-'&2:'('\  '-' addrop
