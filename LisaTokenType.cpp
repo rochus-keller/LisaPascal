@@ -187,15 +187,18 @@ namespace Lisa {
 	bool tokenTypeIsSpecial( int r ) {
 		return r > TT_Specials && r < TT_Max;
 	}
-	static inline char at( const QByteArray& str, int i ){
-		return ( i >= 0 && i < str.size() ? str[i] : 0 );
+	static inline char at( const char* str, quint32 len, int i ){
+		return ( i < len ? str[i] : 0 );
 	}
 	TokenType tokenTypeFromString( const QByteArray& str, int* pos ) {
+		return tokenTypeFromString(str.constData(),str.size(),pos);
+	}
+	TokenType tokenTypeFromString( const char* str, quint32 len, int* pos ) {
 		int i = ( pos != 0 ? *pos: 0 );
 		TokenType res = Tok_Invalid;
-		switch( at(str,i) ){
+		switch( at(str,len,i) ){
 		case '(':
-			if( at(str,i+1) == '*' ){
+			if( at(str,len,i+1) == '*' ){
 				res = Tok_Latt; i += 2;
 			} else {
 				res = Tok_Lpar; i += 1;
@@ -205,7 +208,7 @@ namespace Lisa {
 			res = Tok_Rpar; i += 1;
 			break;
 		case '*':
-			if( at(str,i+1) == ')' ){
+			if( at(str,len,i+1) == ')' ){
 				res = Tok_Ratt; i += 2;
 			} else {
 				res = Tok_Star; i += 1;
@@ -221,7 +224,7 @@ namespace Lisa {
 			res = Tok_Minus; i += 1;
 			break;
 		case '.':
-			if( at(str,i+1) == '.' ){
+			if( at(str,len,i+1) == '.' ){
 				res = Tok_2Dot; i += 2;
 			} else {
 				res = Tok_Dot; i += 1;
@@ -231,7 +234,7 @@ namespace Lisa {
 			res = Tok_Slash; i += 1;
 			break;
 		case ':':
-			if( at(str,i+1) == '=' ){
+			if( at(str,len,i+1) == '=' ){
 				res = Tok_ColonEq; i += 2;
 			} else {
 				res = Tok_Colon; i += 1;
@@ -241,7 +244,7 @@ namespace Lisa {
 			res = Tok_Semi; i += 1;
 			break;
 		case '<':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case '=':
 				res = Tok_Leq; i += 2;
 				break;
@@ -257,7 +260,7 @@ namespace Lisa {
 			res = Tok_Eq; i += 1;
 			break;
 		case '>':
-			if( at(str,i+1) == '=' ){
+			if( at(str,len,i+1) == '=' ){
 				res = Tok_Geq; i += 2;
 			} else {
 				res = Tok_Gt; i += 1;
@@ -276,16 +279,16 @@ namespace Lisa {
 			res = Tok_Hat; i += 1;
 			break;
 		case 'a':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'n':
-				if( at(str,i+2) == 'd' ){
+				if( at(str,len,i+2) == 'd' ){
 					res = Tok_and; i += 3;
 				}
 				break;
 			case 'r':
-				if( at(str,i+2) == 'r' ){
-					if( at(str,i+3) == 'a' ){
-						if( at(str,i+4) == 'y' ){
+				if( at(str,len,i+2) == 'r' ){
+					if( at(str,len,i+3) == 'a' ){
+						if( at(str,len,i+4) == 'y' ){
 							res = Tok_array; i += 5;
 						}
 					}
@@ -294,10 +297,10 @@ namespace Lisa {
 			}
 			break;
 		case 'b':
-			if( at(str,i+1) == 'e' ){
-				if( at(str,i+2) == 'g' ){
-					if( at(str,i+3) == 'i' ){
-						if( at(str,i+4) == 'n' ){
+			if( at(str,len,i+1) == 'e' ){
+				if( at(str,len,i+2) == 'g' ){
+					if( at(str,len,i+3) == 'i' ){
+						if( at(str,len,i+4) == 'n' ){
 							res = Tok_begin; i += 5;
 						}
 					}
@@ -305,18 +308,18 @@ namespace Lisa {
 			}
 			break;
 		case 'c':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'a':
-				if( at(str,i+2) == 's' ){
-					if( at(str,i+3) == 'e' ){
+				if( at(str,len,i+2) == 's' ){
+					if( at(str,len,i+3) == 'e' ){
 						res = Tok_case; i += 4;
 					}
 				}
 				break;
 			case 'o':
-				if( at(str,i+2) == 'n' ){
-					if( at(str,i+3) == 's' ){
-						if( at(str,i+4) == 't' ){
+				if( at(str,len,i+2) == 'n' ){
+					if( at(str,len,i+3) == 's' ){
+						if( at(str,len,i+4) == 't' ){
 							res = Tok_const; i += 5;
 						}
 					}
@@ -325,17 +328,17 @@ namespace Lisa {
 			}
 			break;
 		case 'd':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'i':
-				if( at(str,i+2) == 'v' ){
+				if( at(str,len,i+2) == 'v' ){
 					res = Tok_div; i += 3;
 				}
 				break;
 			case 'o':
-				if( at(str,i+2) == 'w' ){
-					if( at(str,i+3) == 'n' ){
-						if( at(str,i+4) == 't' ){
-							if( at(str,i+5) == 'o' ){
+				if( at(str,len,i+2) == 'w' ){
+					if( at(str,len,i+3) == 'n' ){
+						if( at(str,len,i+4) == 't' ){
+							if( at(str,len,i+5) == 'o' ){
 								res = Tok_downto; i += 6;
 							}
 						}
@@ -347,26 +350,26 @@ namespace Lisa {
 			}
 			break;
 		case 'e':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'l':
-				if( at(str,i+2) == 's' ){
-					if( at(str,i+3) == 'e' ){
+				if( at(str,len,i+2) == 's' ){
+					if( at(str,len,i+3) == 'e' ){
 						res = Tok_else; i += 4;
 					}
 				}
 				break;
 			case 'n':
-				if( at(str,i+2) == 'd' ){
+				if( at(str,len,i+2) == 'd' ){
 					res = Tok_end; i += 3;
 				}
 				break;
 			case 'x':
-				if( at(str,i+2) == 't' ){
-					if( at(str,i+3) == 'e' ){
-						if( at(str,i+4) == 'r' ){
-							if( at(str,i+5) == 'n' ){
-								if( at(str,i+6) == 'a' ){
-									if( at(str,i+7) == 'l' ){
+				if( at(str,len,i+2) == 't' ){
+					if( at(str,len,i+3) == 'e' ){
+						if( at(str,len,i+4) == 'r' ){
+							if( at(str,len,i+5) == 'n' ){
+								if( at(str,len,i+6) == 'a' ){
+									if( at(str,len,i+7) == 'l' ){
 										res = Tok_external; i += 8;
 									}
 								}
@@ -378,20 +381,20 @@ namespace Lisa {
 			}
 			break;
 		case 'f':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'i':
-				if( at(str,i+2) == 'l' ){
-					if( at(str,i+3) == 'e' ){
+				if( at(str,len,i+2) == 'l' ){
+					if( at(str,len,i+3) == 'e' ){
 						res = Tok_file; i += 4;
 					}
 				}
 				break;
 			case 'o':
-				if( at(str,i+2) == 'r' ){
-					if( at(str,i+3) == 'w' ){
-						if( at(str,i+4) == 'a' ){
-							if( at(str,i+5) == 'r' ){
-								if( at(str,i+6) == 'd' ){
+				if( at(str,len,i+2) == 'r' ){
+					if( at(str,len,i+3) == 'w' ){
+						if( at(str,len,i+4) == 'a' ){
+							if( at(str,len,i+5) == 'r' ){
+								if( at(str,len,i+6) == 'd' ){
 									res = Tok_forward; i += 7;
 								}
 							}
@@ -402,12 +405,12 @@ namespace Lisa {
 				}
 				break;
 			case 'u':
-				if( at(str,i+2) == 'n' ){
-					if( at(str,i+3) == 'c' ){
-						if( at(str,i+4) == 't' ){
-							if( at(str,i+5) == 'i' ){
-								if( at(str,i+6) == 'o' ){
-									if( at(str,i+7) == 'n' ){
+				if( at(str,len,i+2) == 'n' ){
+					if( at(str,len,i+3) == 'c' ){
+						if( at(str,len,i+4) == 't' ){
+							if( at(str,len,i+5) == 'i' ){
+								if( at(str,len,i+6) == 'o' ){
+									if( at(str,len,i+7) == 'n' ){
 										res = Tok_function; i += 8;
 									}
 								}
@@ -419,32 +422,32 @@ namespace Lisa {
 			}
 			break;
 		case 'g':
-			if( at(str,i+1) == 'o' ){
-				if( at(str,i+2) == 't' ){
-					if( at(str,i+3) == 'o' ){
+			if( at(str,len,i+1) == 'o' ){
+				if( at(str,len,i+2) == 't' ){
+					if( at(str,len,i+3) == 'o' ){
 						res = Tok_goto; i += 4;
 					}
 				}
 			}
 			break;
 		case 'i':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'f':
 				res = Tok_if; i += 2;
 				break;
 			case 'm':
-				if( at(str,i+2) == 'p' ){
-					if( at(str,i+3) == 'l' ){
-						if( at(str,i+4) == 'e' ){
-							if( at(str,i+5) == 'm' ){
-								if( at(str,i+6) == 'e' ){
-									if( at(str,i+7) == 'n' ){
-										if( at(str,i+8) == 't' ){
-											if( at(str,i+9) == 'a' ){
-												if( at(str,i+10) == 't' ){
-													if( at(str,i+11) == 'i' ){
-														if( at(str,i+12) == 'o' ){
-															if( at(str,i+13) == 'n' ){
+				if( at(str,len,i+2) == 'p' ){
+					if( at(str,len,i+3) == 'l' ){
+						if( at(str,len,i+4) == 'e' ){
+							if( at(str,len,i+5) == 'm' ){
+								if( at(str,len,i+6) == 'e' ){
+									if( at(str,len,i+7) == 'n' ){
+										if( at(str,len,i+8) == 't' ){
+											if( at(str,len,i+9) == 'a' ){
+												if( at(str,len,i+10) == 't' ){
+													if( at(str,len,i+11) == 'i' ){
+														if( at(str,len,i+12) == 'o' ){
+															if( at(str,len,i+13) == 'n' ){
 																res = Tok_implementation; i += 14;
 															}
 														}
@@ -460,24 +463,24 @@ namespace Lisa {
 				}
 				break;
 			case 'n':
-				switch( at(str,i+2) ){
+				switch( at(str,len,i+2) ){
 				case 'l':
-					if( at(str,i+3) == 'i' ){
-						if( at(str,i+4) == 'n' ){
-							if( at(str,i+5) == 'e' ){
+					if( at(str,len,i+3) == 'i' ){
+						if( at(str,len,i+4) == 'n' ){
+							if( at(str,len,i+5) == 'e' ){
 								res = Tok_inline; i += 6;
 							}
 						}
 					}
 					break;
 				case 't':
-					switch( at(str,i+3) ){
+					switch( at(str,len,i+3) ){
 					case 'e':
-						if( at(str,i+4) == 'r' ){
-							if( at(str,i+5) == 'f' ){
-								if( at(str,i+6) == 'a' ){
-									if( at(str,i+7) == 'c' ){
-										if( at(str,i+8) == 'e' ){
+						if( at(str,len,i+4) == 'r' ){
+							if( at(str,len,i+5) == 'f' ){
+								if( at(str,len,i+6) == 'a' ){
+									if( at(str,len,i+7) == 'c' ){
+										if( at(str,len,i+8) == 'e' ){
 											res = Tok_interface; i += 9;
 										}
 									}
@@ -486,11 +489,11 @@ namespace Lisa {
 						}
 						break;
 					case 'r':
-						if( at(str,i+4) == 'i' ){
-							if( at(str,i+5) == 'n' ){
-								if( at(str,i+6) == 's' ){
-									if( at(str,i+7) == 'i' ){
-										if( at(str,i+8) == 'c' ){
+						if( at(str,len,i+4) == 'i' ){
+							if( at(str,len,i+5) == 'n' ){
+								if( at(str,len,i+6) == 's' ){
+									if( at(str,len,i+7) == 'i' ){
+										if( at(str,len,i+8) == 'c' ){
 											res = Tok_intrinsic; i += 9;
 										}
 									}
@@ -508,10 +511,10 @@ namespace Lisa {
 			}
 			break;
 		case 'l':
-			if( at(str,i+1) == 'a' ){
-				if( at(str,i+2) == 'b' ){
-					if( at(str,i+3) == 'e' ){
-						if( at(str,i+4) == 'l' ){
+			if( at(str,len,i+1) == 'a' ){
+				if( at(str,len,i+2) == 'b' ){
+					if( at(str,len,i+3) == 'e' ){
+						if( at(str,len,i+4) == 'l' ){
 							res = Tok_label; i += 5;
 						}
 					}
@@ -519,13 +522,13 @@ namespace Lisa {
 			}
 			break;
 		case 'm':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'e':
-				if( at(str,i+2) == 't' ){
-					if( at(str,i+3) == 'h' ){
-						if( at(str,i+4) == 'o' ){
-							if( at(str,i+5) == 'd' ){
-								if( at(str,i+6) == 's' ){
+				if( at(str,len,i+2) == 't' ){
+					if( at(str,len,i+3) == 'h' ){
+						if( at(str,len,i+4) == 'o' ){
+							if( at(str,len,i+5) == 'd' ){
+								if( at(str,len,i+6) == 's' ){
 									res = Tok_methods; i += 7;
 								}
 							}
@@ -534,28 +537,28 @@ namespace Lisa {
 				}
 				break;
 			case 'o':
-				if( at(str,i+2) == 'd' ){
+				if( at(str,len,i+2) == 'd' ){
 					res = Tok_mod; i += 3;
 				}
 				break;
 			}
 			break;
 		case 'n':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'i':
-				if( at(str,i+2) == 'l' ){
+				if( at(str,len,i+2) == 'l' ){
 					res = Tok_nil; i += 3;
 				}
 				break;
 			case 'o':
-				if( at(str,i+2) == 't' ){
+				if( at(str,len,i+2) == 't' ){
 					res = Tok_not; i += 3;
 				}
 				break;
 			}
 			break;
 		case 'o':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'f':
 				res = Tok_of; i += 2;
 				break;
@@ -563,13 +566,13 @@ namespace Lisa {
 				res = Tok_or; i += 2;
 				break;
 			case 't':
-				if( at(str,i+2) == 'h' ){
-					if( at(str,i+3) == 'e' ){
-						if( at(str,i+4) == 'r' ){
-							if( at(str,i+5) == 'w' ){
-								if( at(str,i+6) == 'i' ){
-									if( at(str,i+7) == 's' ){
-										if( at(str,i+8) == 'e' ){
+				if( at(str,len,i+2) == 'h' ){
+					if( at(str,len,i+3) == 'e' ){
+						if( at(str,len,i+4) == 'r' ){
+							if( at(str,len,i+5) == 'w' ){
+								if( at(str,len,i+6) == 'i' ){
+									if( at(str,len,i+7) == 's' ){
+										if( at(str,len,i+8) == 'e' ){
 											res = Tok_otherwise; i += 9;
 										}
 									}
@@ -582,12 +585,12 @@ namespace Lisa {
 			}
 			break;
 		case 'p':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'a':
-				if( at(str,i+2) == 'c' ){
-					if( at(str,i+3) == 'k' ){
-						if( at(str,i+4) == 'e' ){
-							if( at(str,i+5) == 'd' ){
+				if( at(str,len,i+2) == 'c' ){
+					if( at(str,len,i+3) == 'k' ){
+						if( at(str,len,i+4) == 'e' ){
+							if( at(str,len,i+5) == 'd' ){
 								res = Tok_packed; i += 6;
 							}
 						}
@@ -595,14 +598,14 @@ namespace Lisa {
 				}
 				break;
 			case 'r':
-				if( at(str,i+2) == 'o' ){
-					switch( at(str,i+3) ){
+				if( at(str,len,i+2) == 'o' ){
+					switch( at(str,len,i+3) ){
 					case 'c':
-						if( at(str,i+4) == 'e' ){
-							if( at(str,i+5) == 'd' ){
-								if( at(str,i+6) == 'u' ){
-									if( at(str,i+7) == 'r' ){
-										if( at(str,i+8) == 'e' ){
+						if( at(str,len,i+4) == 'e' ){
+							if( at(str,len,i+5) == 'd' ){
+								if( at(str,len,i+6) == 'u' ){
+									if( at(str,len,i+7) == 'r' ){
+										if( at(str,len,i+8) == 'e' ){
 											res = Tok_procedure; i += 9;
 										}
 									}
@@ -611,9 +614,9 @@ namespace Lisa {
 						}
 						break;
 					case 'g':
-						if( at(str,i+4) == 'r' ){
-							if( at(str,i+5) == 'a' ){
-								if( at(str,i+6) == 'm' ){
+						if( at(str,len,i+4) == 'r' ){
+							if( at(str,len,i+5) == 'a' ){
+								if( at(str,len,i+6) == 'm' ){
 									res = Tok_program; i += 7;
 								}
 							}
@@ -625,21 +628,21 @@ namespace Lisa {
 			}
 			break;
 		case 'r':
-			if( at(str,i+1) == 'e' ){
-				switch( at(str,i+2) ){
+			if( at(str,len,i+1) == 'e' ){
+				switch( at(str,len,i+2) ){
 				case 'c':
-					if( at(str,i+3) == 'o' ){
-						if( at(str,i+4) == 'r' ){
-							if( at(str,i+5) == 'd' ){
+					if( at(str,len,i+3) == 'o' ){
+						if( at(str,len,i+4) == 'r' ){
+							if( at(str,len,i+5) == 'd' ){
 								res = Tok_record; i += 6;
 							}
 						}
 					}
 					break;
 				case 'p':
-					if( at(str,i+3) == 'e' ){
-						if( at(str,i+4) == 'a' ){
-							if( at(str,i+5) == 't' ){
+					if( at(str,len,i+3) == 'e' ){
+						if( at(str,len,i+4) == 'a' ){
+							if( at(str,len,i+5) == 't' ){
 								res = Tok_repeat; i += 6;
 							}
 						}
@@ -649,17 +652,17 @@ namespace Lisa {
 			}
 			break;
 		case 's':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'e':
-				if( at(str,i+2) == 't' ){
+				if( at(str,len,i+2) == 't' ){
 					res = Tok_set; i += 3;
 				}
 				break;
 			case 'h':
-				if( at(str,i+2) == 'a' ){
-					if( at(str,i+3) == 'r' ){
-						if( at(str,i+4) == 'e' ){
-							if( at(str,i+5) == 'd' ){
+				if( at(str,len,i+2) == 'a' ){
+					if( at(str,len,i+3) == 'r' ){
+						if( at(str,len,i+4) == 'e' ){
+							if( at(str,len,i+5) == 'd' ){
 								res = Tok_shared; i += 6;
 							}
 						}
@@ -667,10 +670,10 @@ namespace Lisa {
 				}
 				break;
 			case 't':
-				if( at(str,i+2) == 'r' ){
-					if( at(str,i+3) == 'i' ){
-						if( at(str,i+4) == 'n' ){
-							if( at(str,i+5) == 'g' ){
+				if( at(str,len,i+2) == 'r' ){
+					if( at(str,len,i+3) == 'i' ){
+						if( at(str,len,i+4) == 'n' ){
+							if( at(str,len,i+5) == 'g' ){
 								res = Tok_string; i += 6;
 							}
 						}
@@ -678,12 +681,12 @@ namespace Lisa {
 				}
 				break;
 			case 'u':
-				if( at(str,i+2) == 'b' ){
-					if( at(str,i+3) == 'c' ){
-						if( at(str,i+4) == 'l' ){
-							if( at(str,i+5) == 'a' ){
-								if( at(str,i+6) == 's' ){
-									if( at(str,i+7) == 's' ){
+				if( at(str,len,i+2) == 'b' ){
+					if( at(str,len,i+3) == 'c' ){
+						if( at(str,len,i+4) == 'l' ){
+							if( at(str,len,i+5) == 'a' ){
+								if( at(str,len,i+6) == 's' ){
+									if( at(str,len,i+7) == 's' ){
 										res = Tok_subclass; i += 8;
 									}
 								}
@@ -695,10 +698,10 @@ namespace Lisa {
 			}
 			break;
 		case 't':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'h':
-				if( at(str,i+2) == 'e' ){
-					if( at(str,i+3) == 'n' ){
+				if( at(str,len,i+2) == 'e' ){
+					if( at(str,len,i+3) == 'n' ){
 						res = Tok_then; i += 4;
 					}
 				}
@@ -707,8 +710,8 @@ namespace Lisa {
 				res = Tok_to; i += 2;
 				break;
 			case 'y':
-				if( at(str,i+2) == 'p' ){
-					if( at(str,i+3) == 'e' ){
+				if( at(str,len,i+2) == 'p' ){
+					if( at(str,len,i+3) == 'e' ){
 						res = Tok_type; i += 4;
 					}
 				}
@@ -716,17 +719,17 @@ namespace Lisa {
 			}
 			break;
 		case 'u':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'n':
-				switch( at(str,i+2) ){
+				switch( at(str,len,i+2) ){
 				case 'i':
-					if( at(str,i+3) == 't' ){
+					if( at(str,len,i+3) == 't' ){
 						res = Tok_unit; i += 4;
 					}
 					break;
 				case 't':
-					if( at(str,i+3) == 'i' ){
-						if( at(str,i+4) == 'l' ){
+					if( at(str,len,i+3) == 'i' ){
+						if( at(str,len,i+4) == 'l' ){
 							res = Tok_until; i += 5;
 						}
 					}
@@ -734,8 +737,8 @@ namespace Lisa {
 				}
 				break;
 			case 's':
-				if( at(str,i+2) == 'e' ){
-					if( at(str,i+3) == 's' ){
+				if( at(str,len,i+2) == 'e' ){
+					if( at(str,len,i+3) == 's' ){
 						res = Tok_uses; i += 4;
 					}
 				}
@@ -743,26 +746,26 @@ namespace Lisa {
 			}
 			break;
 		case 'v':
-			if( at(str,i+1) == 'a' ){
-				if( at(str,i+2) == 'r' ){
+			if( at(str,len,i+1) == 'a' ){
+				if( at(str,len,i+2) == 'r' ){
 					res = Tok_var; i += 3;
 				}
 			}
 			break;
 		case 'w':
-			switch( at(str,i+1) ){
+			switch( at(str,len,i+1) ){
 			case 'h':
-				if( at(str,i+2) == 'i' ){
-					if( at(str,i+3) == 'l' ){
-						if( at(str,i+4) == 'e' ){
+				if( at(str,len,i+2) == 'i' ){
+					if( at(str,len,i+3) == 'l' ){
+						if( at(str,len,i+4) == 'e' ){
 							res = Tok_while; i += 5;
 						}
 					}
 				}
 				break;
 			case 'i':
-				if( at(str,i+2) == 't' ){
-					if( at(str,i+3) == 'h' ){
+				if( at(str,len,i+2) == 't' ){
+					if( at(str,len,i+3) == 'h' ){
 						res = Tok_with; i += 4;
 					}
 				}

@@ -253,6 +253,7 @@ public:
     AsmFile* getAsmFile(const QString& path) const;
     Scope* getGlobals() { return &d_globals; }
     Ranges getMutes( const QString& path );
+    int getErrCount() const { return d_errCount; }
 
     // overrides
     QVariant data ( const QModelIndex & index, int role = Qt::DisplayRole ) const;
@@ -269,6 +270,7 @@ private:
     QHash<QString,CodeFile*> d_map2; // real path -> file
     quint32 d_sloc; // number of lines of code without empty or comment lines
     QHash<QString,Ranges> d_mutes;
+    int d_errCount;
 };
 
 class ModuleDetailMdl : public ItemModel

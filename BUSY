@@ -1,53 +1,52 @@
 # author: Rochus Keller (me@rochus-keller.ch)
 # License: GPL
-# See https://github.com/rochus-keller/LisaPascal#how-to-build-the-parser-and-code-navigator and 
+# See https://github.com/rochus-keller/LisaPascal#how-to-build-the-parser-and-code-navigator and
 # https://github.com/rochus-keller/BUSY/blob/main/README.md on how to use this file
 
 if busy_version < "2023-01-15" {
-	error("this version of BUSY is not compatible with this build")
+    error("this version of BUSY is not compatible with this build")
 }
 
 submod qt = ../LeanQt (HAVE_ITEMVIEWS)
 
 let run_moc : Moc {
-	.sources += [
-		./LisaCodeNavigator.h
-		./LisaCodeModel.h
-	]
+    .sources += [
+        ./LisaCodeNavigator.h
+        ./LisaCodeModel.h
+    ]
 }
-	
+
 let run_rcc : Rcc {
-	.deps += qt.copy_rcc;
-	.tool_dir = root_build_dir + relpath(qt);
-	.sources += ./CodeNavigator.qrc
+    .deps += qt.copy_rcc;
+    .tool_dir = root_build_dir + relpath(qt);
+    .sources += ./CodeNavigator.qrc
 }
 
 let exe ! : Executable {
-	.configs += [ qt.qt_client_config ]
-	.sources = [
-		./LisaLexer.cpp 
-		./LisaSynTree.cpp 
-		./LisaTokenType.cpp 
-		./LisaHighlighter.cpp 
-		./LisaCodeNavigator.cpp 
-		./LisaCodeModel.cpp 
-		./LisaParser.cpp 
-		./LisaToken.cpp 
-		./LisaFileSystem.cpp 
-		./LisaPpLexer.cpp
-		./AsmLexer.cpp
-		./AsmTokenType.cpp
-		./AsmParser.cpp
-    	./AsmPpLexer.cpp
-    	./AsmSynTree.cpp
-	]
-	.include_dirs += [ . .. ]
-	.deps += [ qt.copy_rcc qt.libqt run_rcc run_moc ]
-	if target_os == `win32 {
-		.deps += qt.libqtwinmain
-	}
-	.name = "LisaCodeNavigator"
+    .configs += [ qt.qt_client_config ]
+    .sources = [
+        ./LisaLexer.cpp
+        ./LisaSynTree.cpp
+        ./LisaTokenType.cpp
+        ./LisaHighlighter.cpp
+        ./LisaCodeNavigator.cpp
+        ./LisaCodeModel.cpp
+        ./LisaParser.cpp
+        ./LisaToken.cpp
+        ./LisaFileSystem.cpp
+        ./LisaPpLexer.cpp
+        ./AsmLexer.cpp
+        ./AsmTokenType.cpp
+        ./AsmParser.cpp
+        ./AsmPpLexer.cpp
+        ./AsmSynTree.cpp
+    ]
+    .include_dirs += [ . .. ]
+    .deps += [ qt.copy_rcc qt.libqt run_rcc run_moc ]
+    if target_os == `win32 {
+        .deps += qt.libqtwinmain
+    }
+    .name = "LisaCodeNavigator"
 }
-
 
 

@@ -19,6 +19,7 @@
 #include <QFile>
 #include <QtDebug>
 #include <QCryptographicHash>
+#include <QElapsedTimer>
 #include "LisaPpLexer.h"
 #include "LisaParser.h"
 #include "Converter.h"
@@ -106,6 +107,28 @@ static void checkDir( const QStringList& files, int off)
     }
 }
 
+#define _USE_EBNF_STUDIO_PARSER_
+
+class Lex
+        #ifdef _USE_EBNF_STUDIO_PARSER_
+        : public Scanner
+        #endif
+{
+public:
+    PpLexer lex;
+    Token next()
+    {
+        return lex.nextToken();
+    }
+
+    Token peek(int offset)
+    {
+        return lex.peekToken(offset);
+    }
+
+    Lex(FileSystem*fs):lex(fs){}
+};
+
 static void runParser(const QString& root)
 {
     FileSystem fs;
@@ -114,12 +137,18 @@ static void runParser(const QString& root)
 
     QList<const FileSystem::File*> files = fs.getAllPas();
     int ok = 0;
+    QElapsedTimer timer;
+    timer.start();
     foreach( const FileSystem::File* file, files )
     {
         const QString path = file->getVirtualPath();
-        PpLexer lex(&fs);
-        lex.reset(file->d_realPath);
+        Lex lex(&fs);
+        lex.lex.reset(file->d_realPath);
+#ifdef _USE_EBNF_STUDIO_PARSER_
         Parser p(&lex);
+#else
+        Parser p(&lex.lex);
+#endif
         qDebug() << "**** parsing" << path;
         p.RunParser();
         if( !p.errors.isEmpty() )
@@ -137,10 +166,15 @@ static void runParser(const QString& root)
         QFile out(file->d_realPath + ".st");
         out.open(QIODevice::WriteOnly);
         QTextStream s(&out);
-        dump(s,&p.d_root,0);
+#ifdef _USE_EBNF_STUDIO_PARSER_
+    dump(s,&p.root,0);
+#else
+    dump(s,&p.d_root,0);
+#endif
 #endif
     }
-    qDebug() << "#### finished with" << ok << "files ok of total" << files.size() << "files";
+    qDebug() << "#### finished with" << ok << "files ok of total" << files.size() << "files"
+             << "in" << timer.elapsed() << " [ms]";
 }
 
 static void runParser(const QString& root, const QString& path)
@@ -148,9 +182,13 @@ static void runParser(const QString& root, const QString& path)
     FileSystem fs;
     fs.load(root);
 
-    PpLexer lex(&fs);
-    lex.reset(path);
+    Lex lex(&fs);
+    lex.lex.reset(path);
+#ifdef _USE_EBNF_STUDIO_PARSER_
     Parser p(&lex);
+#else
+    Parser p(&lex.lex);
+#endif
     qDebug() << "**** parsing" << path;
     p.RunParser();
     if( !p.errors.isEmpty() )
@@ -163,11 +201,15 @@ static void runParser(const QString& root, const QString& path)
     {
         qDebug() << "ok";
     }
-#if 1
+#if 0
     QFile out(path + ".st");
     out.open(QIODevice::WriteOnly);
     QTextStream s(&out);
+#ifdef _USE_EBNF_STUDIO_PARSER_
+    dump(s,&p.root,0);
+#else
     dump(s,&p.d_root,0);
+#endif
 #endif
 }
 

@@ -29,6 +29,7 @@
 using namespace Lisa;
 
 #define LISA_WITH_MISSING
+#define _USE_EBNF_STUDIO_PARSER_
 
 class PascalModelVisitor
 {
@@ -54,6 +55,10 @@ public:
         cf->d_globals = d_mdl->getGlobals();
         if( top->d_children.isEmpty() )
             return;
+#ifdef _USE_EBNF_STUDIO_PARSER_
+        if( top->d_tok.d_type == Tok_Invalid )
+            top = top->d_children.first();
+#endif
         switch(top->d_children.first()->d_tok.d_type)
         {
         case SynTree::R_program_:
@@ -1421,7 +1426,7 @@ private:
     }
 };
 
-CodeModel::CodeModel(QObject *parent) : ItemModel(parent),d_sloc(0)
+CodeModel::CodeModel(QObject *parent) : ItemModel(parent),d_sloc(0),d_errCount(0)
 {
     d_fs = new FileSystem(this);
 }
@@ -1435,6 +1440,7 @@ bool CodeModel::load(const QString& rootDir)
     d_map1.clear();
     d_map2.clear();
     d_sloc = 0;
+    d_errCount = 0;
     d_mutes.clear();
     d_fs->load(rootDir);
     QList<ModelItem*> fileSlots;
@@ -1677,6 +1683,27 @@ int ItemModel::rowCount(const QModelIndex& parent) const
         return d_root.d_children.size();
 }
 
+
+class Lex
+        #ifdef _USE_EBNF_STUDIO_PARSER_
+        : public Scanner
+        #endif
+{
+public:
+    PpLexer lex;
+    Token next()
+    {
+        return lex.nextToken();
+    }
+
+    Token peek(int offset)
+    {
+        return lex.peekToken(offset);
+    }
+
+    Lex(FileSystem*fs):lex(fs){}
+};
+
 void CodeModel::parseAndResolve(UnitFile* unit)
 {
     if( unit->d_file->d_parsed )
@@ -1691,6 +1718,7 @@ void CodeModel::parseAndResolve(UnitFile* unit)
             const QString line = tr("%1: cannot resolve referenced unit '%2'")
                     .arg( unit->d_file->getVirtualPath(false) ).arg(usedNames[i].constData());
             qCritical() << line.toUtf8().constData();
+            d_errCount++;
         }else
         {
             UnitFile* uf = d_map1.value(u);
@@ -1701,9 +1729,13 @@ void CodeModel::parseAndResolve(UnitFile* unit)
     }
 
     const_cast<FileSystem::File*>(unit->d_file)->d_parsed = true;
-    PpLexer lex(d_fs);
-    lex.reset(unit->d_file->d_realPath);
+    Lex lex(d_fs);
+    lex.lex.reset(unit->d_file->d_realPath);
+#ifdef _USE_EBNF_STUDIO_PARSER_
     Parser p(&lex);
+#else
+    Parser p(&lex.lex);
+#endif
     p.RunParser();
     const int off = d_fs->getRootPath().size();
     if( !p.errors.isEmpty() )
@@ -1714,10 +1746,11 @@ void CodeModel::parseAndResolve(UnitFile* unit)
             const QString line = tr("%1:%2:%3: %4").arg( f ? f->getVirtualPath() : e.path.mid(off) ).arg(e.row)
                     .arg(e.col).arg(e.msg);
             qCritical() << line.toUtf8().constData();
+            d_errCount++;
         }
 
     }
-    foreach( const PpLexer::Include& f, lex.getIncludes() )
+    foreach( const PpLexer::Include& f, lex.lex.getIncludes() )
     {
         IncludeFile* inc = new IncludeFile();
         inc->d_file = f.d_inc;
@@ -1732,12 +1765,16 @@ void CodeModel::parseAndResolve(UnitFile* unit)
             d_map2[f.d_inc->d_realPath] = inc;
         unit->d_includes.append(inc);
     }
-    d_sloc += lex.getSloc();
-    for( QHash<QString,Ranges>::const_iterator i = lex.getMutes().begin(); i != lex.getMutes().end(); ++i )
+    d_sloc += lex.lex.getSloc();
+    for( QHash<QString,Ranges>::const_iterator i = lex.lex.getMutes().begin(); i != lex.lex.getMutes().end(); ++i )
         d_mutes.insert(i.key(),i.value());
 
     PascalModelVisitor v(this);
-    v.visit(unit,&p.d_root); // visit takes ~8% more time than just parsing
+#ifdef _USE_EBNF_STUDIO_PARSER_
+    v.visit(unit,&p.root); // visit takes ~8% more time than just parsing
+#else
+    v.visit(unit,&p.d_root);
+#endif
 
     QCoreApplication::processEvents();
 }
@@ -1758,6 +1795,7 @@ void CodeModel::parseAndResolve(AsmFile* unit)
             const QString line = tr("%1:%2:%3: %4").arg( f ? f->getVirtualPath() : e.path.mid(off) ).arg(e.row)
                     .arg(e.col).arg(e.msg);
             qCritical() << line.toUtf8().constData();
+            d_errCount++;
         }
 
     }
