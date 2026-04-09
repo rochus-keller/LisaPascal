@@ -22,6 +22,7 @@
 #include "LisaHighlighter.h"
 #include "LisaLexer.h"
 #include "AsmLexer.h"
+//#include "ExecLexer.h"
 #include <QBuffer>
 using namespace Lisa;
 
@@ -298,3 +299,137 @@ void AsmPainter::highlightBlock(const QString& text)
 
     setCurrentBlockState((braceDepth << 8) | lexerState );
 }
+
+#if 0
+ExecPainter::ExecPainter(QObject* parent) :
+    QSyntaxHighlighter(parent)
+{
+    for( int i = 0; i < C_Max; i++ )
+    {
+        d_format[i].setFontWeight(QFont::Normal);
+        d_format[i].setForeground(Qt::black);
+        d_format[i].setBackground(Qt::transparent);
+    }
+    d_format[C_Num].setForeground(QColor(0, 153, 153));
+    d_format[C_Str].setForeground(QColor(208, 16, 64));
+    d_format[C_Cmt].setForeground(QColor(153, 153, 136));
+    d_format[C_Kw].setForeground(QColor(68, 85, 136));
+    d_format[C_Kw].setFontWeight(QFont::Bold);
+    d_format[C_Op].setForeground(QColor(153, 0, 0));
+    d_format[C_Op].setFontWeight(QFont::Bold);
+    d_format[C_Pp].setFontWeight(QFont::Bold);
+    d_format[C_Pp].setForeground(QColor(0, 128, 0));
+    d_format[C_Pp].setBackground(QColor(230, 255, 230));
+    d_format[C_Label].setForeground(QColor(251, 138, 0));
+    d_format[C_Label].setBackground(QColor(253, 217, 165));
+}
+
+void ExecPainter::highlightBlock(const QString& text)
+{
+    const int previousBlockState_ = previousBlockState();
+    int lexerState = 0, initialBraceDepth = 0;
+    if (previousBlockState_ != -1) {
+        lexerState = previousBlockState_ & 0xff;
+        initialBraceDepth = previousBlockState_ >> 8;
+    }
+
+    int braceDepth = initialBraceDepth;
+
+    // Protocol:
+    // lexerState == 1: multi-line (* *) comment
+    // lexerState == 2: multi-line { } comment
+    // lexerState == 3: (*$ *) directive
+    // lexerState == 4: {$ } directive
+
+    int start = 0;
+    if( lexerState == 1 || lexerState == 3 )
+    {
+        QTextCharFormat f = formatForCategory( lexerState == 1 ? C_Cmt : C_Pp);
+        int pos = text.indexOf("*)");
+        if( pos == -1 )
+        {
+            // the whole block ist part of comment
+            setFormat( start, text.size(), f );
+            setCurrentBlockState( (braceDepth << 8) | lexerState);
+            return;
+        }else
+        {
+            // End of comment found
+            pos += 2;
+            setFormat( start, pos , f );
+            lexerState = 0;
+            braceDepth--;
+            start = pos;
+        }
+    }else if( lexerState == 2 || lexerState == 4 )
+    {
+        QTextCharFormat f = formatForCategory( lexerState == 2 ? C_Cmt : C_Pp);
+        int pos = text.indexOf('}');
+        if( pos == -1 )
+        {
+            // the whole block ist part of comment
+            setFormat( start, text.size(), f );
+            setCurrentBlockState( (braceDepth << 8) | lexerState);
+            return;
+        }else
+        {
+            // End of comment found
+            pos += 1;
+            setFormat( start, pos , f );
+            lexerState = 0;
+            braceDepth--;
+            start = pos;
+        }
+    }
+
+
+    Exec::Lexer lex;
+    lex.setHaveComments(true);
+
+    QList<Exec::Token> tokens = lex.tokenize(text.mid(start).toLatin1());
+    int col = 0;
+    for( int i = 0; i < tokens.size(); ++i )
+    {
+        const Exec::Token &t = tokens[i];
+        if( t.type == Exec::Token::TOK_NEWLINE || t.type == Exec::Token::TOK_EOF )
+            continue;
+        col += start;
+
+        QTextCharFormat f;
+        if( t.type == Exec::Token::TOK_LBRACE )
+        {
+            f = formatForCategory(C_Cmt);
+            lexerState = 2;
+            if( t.text.endsWith("}") )
+                lexerState = 0;
+            else
+                braceDepth++;
+        }else if( t.type == Exec::Token::TOK_STRING_SIMPLE || t.type == Exec::Token::TOK_STRING_EXPANDED )
+            f = formatForCategory(C_Str);
+        else if( t.type == Exec::Token::TOK_NUMBER )
+            f = formatForCategory(C_Num);
+        else if( t.type >= Exec::Token::TOK_LPAREN && t.type <= Exec::Token::TOK_DIV  )
+        {
+            f = formatForCategory(C_Op);
+        }else if( t.type == Exec::Token::TOK_IDENTIFIER || t.type == Exec::Token::TOK_VAR_NUMBER )
+        {
+            const QByteArray name = t.text.toUpper();
+            if( d_builtins.contains(name) )
+                f = formatForCategory(C_Label);
+            else if( d_keywords.contains(name) )
+                f = formatForCategory(C_Kw);
+            else
+                f = formatForCategory(C_Ident);
+        }
+
+        /*if( lexerState == 3 )
+            setFormat( startPp, t.d_colNr - startPp + t.d_val.size(), formatForCategory(C_Pp) );
+        else */
+        if( f.isValid() )
+            setFormat( col, t.text.size(), f );
+        col += t.text.size();
+    }
+
+    setCurrentBlockState((braceDepth << 8) | lexerState );
+}
+#endif

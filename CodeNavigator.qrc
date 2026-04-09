@@ -17,5 +17,6 @@
         <file>images/class.png</file>
         <file>images/source.png</file>
         <file>images/assembler.png</file>
+        <file>images/gear.png</file>
     </qresource>
 </RCC>

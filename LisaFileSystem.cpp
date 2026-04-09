@@ -85,6 +85,8 @@ bool FileSystem::load(const QString& rootDir)
         if( fileType == UnknownFile )
             fileType = detectType2(&in,&moduleName);
         if( fileType == UnknownFile )
+            fileType = detectExec(&in);
+        if( fileType == UnknownFile )
             continue;
         in.close();
 
@@ -377,6 +379,54 @@ FileSystem::FileType FileSystem::detectType2(QIODevice* in, QByteArray* name)
     return res;
 }
 
+FileSystem::FileType FileSystem::detectExec(QIODevice *in_)
+{
+    Q_ASSERT(in_);
+    in_->reset();
+    QTextStream in(in_);
+    bool inComment = false;
+
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QString cleanedLine = "";
+
+        // Strip Lisa Workshop block comments { ... } character by character
+        for (int i = 0; i < line.length(); ++i) {
+            if (!inComment && line[i] == '{') {
+                inComment = true;
+            } else if (inComment && line[i] == '}') {
+                inComment = false;
+            } else if (!inComment) {
+                cleanedLine += line[i];
+            }
+        }
+
+        cleanedLine = cleanedLine.trimmed();
+
+        // If the line was just comments or whitespace, move to the next line
+        if (cleanedLine.isEmpty()) {
+            continue;
+        }
+
+        // We found the first line of actual code. Check if it's an EXEC command.
+        // Lisa commands are case-insensitive.
+        QString upperLine = cleanedLine.toUpper();
+
+        // The EXEC command can stand alone, have a space, or immediately open
+        // a parenthesis for a variable declaration list like EXEC(vol,day)
+        if (upperLine == "EXEC"  || upperLine.startsWith("EXEC ")  || upperLine.startsWith("EXEC(") ||
+                upperLine == "$EXEC" || upperLine.startsWith("$EXEC ") || upperLine.startsWith("$EXEC(")) {
+
+            return ExecFile;
+        }
+
+        // If the first real code isn't EXEC, it's likely a Pascal PROGRAM or UNIT.
+        return UnknownFile;
+    }
+
+    return UnknownFile;
+}
+
 bool FileSystem::error(const QString& msg)
 {
     d_error = msg;
@@ -425,6 +475,8 @@ static const char* typeName(int t)
     case FileSystem::AsmFragment:
     case FileSystem::AsmUnit:
         return ".asm";
+    case FileSystem::ExecFile:
+        return ".exec";
     default:
         return "";
     }

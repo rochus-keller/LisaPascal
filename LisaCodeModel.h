@@ -41,6 +41,7 @@ public:
        /* Scope: */ Interface, Implementation, Body, Members,
        /* UnitFile: */ Unit,
        /* AsmFile: */ Assembler,
+       /* ExecFile: */ Exec,
        /* AsmInclude: */ AsmIncl,
        /* IncludeFile: */ Include,
        /* CodeFolder: */ Folder
@@ -193,6 +194,14 @@ public:
 
     AsmFile():d_impl(0){ d_kind = Assembler; }
     ~AsmFile();
+};
+
+class ExecFile : public CodeFile
+{
+public:
+    Scope* d_impl; // owns
+
+    ExecFile():d_impl(0){ d_kind = Exec; }
 };
 
 class CodeFolder : public Thing

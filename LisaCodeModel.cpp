@@ -1590,6 +1590,8 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
             return static_cast<UnitFile*>(s->d_thing)->d_file->d_name;
         case Thing::Assembler:
             return static_cast<AsmFile*>(s->d_thing)->d_file->d_name;
+        case Thing::Exec:
+            return static_cast<ExecFile*>(s->d_thing)->d_file->d_name;
         case Thing::AsmIncl:
             return static_cast<AsmInclude*>(s->d_thing)->d_file->d_name;
         case Thing::Include:
@@ -1610,6 +1612,8 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
             return QPixmap(":/images/assembler.png");
         case Thing::Folder:
             return QPixmap(":/images/folder.png");
+        case Thing::Exec:
+            return QPixmap(":/images/gear.png");
         }
         break;
     case Qt::ToolTipRole:
@@ -1628,6 +1632,8 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
             }
         case Thing::Assembler:
             return static_cast<AsmFile*>(s->d_thing)->d_file->d_realPath;
+        case Thing::Exec:
+            return static_cast<ExecFile*>(s->d_thing)->d_file->d_realPath;
         case Thing::AsmIncl:
             return static_cast<AsmInclude*>(s->d_thing)->d_file->d_realPath;
         case Thing::Include:
@@ -1873,6 +1879,15 @@ void CodeModel::fillFolders(ModelItem* root, const FileSystem::Dir* super, CodeF
             f->d_file = super->d_files[i];
             f->d_folder = top;
             //d_map1[f->d_file] = f;
+            d_map2[f->d_file->d_realPath] = f;
+            top->d_files.append(f);
+            ModelItem* s = new ModelItem(root,f);
+            fileSlots.append(s);
+        }else if( super->d_files[i]->d_type == FileSystem::ExecFile )
+        {
+            ExecFile* f = new ExecFile();
+            f->d_file = super->d_files[i];
+            f->d_folder = top;
             d_map2[f->d_file->d_realPath] = f;
             top->d_files.append(f);
             ModelItem* s = new ModelItem(root,f);

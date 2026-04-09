@@ -45,7 +45,7 @@ public:
         ~Dir() { clear(); }
     };
 
-    enum FileType { UnknownFile, PascalProgram, PascalUnit, PascalFragment, AsmUnit, AsmFragment };
+    enum FileType { UnknownFile, PascalProgram, PascalUnit, PascalFragment, AsmUnit, AsmFragment, ExecFile };
     struct File
     {
         quint8 d_type;
@@ -77,6 +77,7 @@ public:
 
     static FileType detectType(QIODevice* in, QByteArray* = 0);
     static FileType detectType2(QIODevice* in, QByteArray* = 0);
+    static FileType detectExec(QIODevice* in);
 protected:
     bool error( const QString& );
     Dir* getDir( const QString& relPath );

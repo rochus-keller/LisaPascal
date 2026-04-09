@@ -57,6 +57,22 @@ namespace Lisa
         QTextCharFormat d_format[C_Max];
     };
 
+#if 0
+    class ExecPainter : public QSyntaxHighlighter
+    {
+    public:
+        ExecPainter(QObject* parent);
+
+        // overrides
+        void highlightBlock(const QString &text);
+    private:
+        enum Category { C_Num, C_Str, C_Kw, C_Ident, C_Op, C_Pp, C_Cmt, C_Label, C_Max };
+        QSet<QByteArray> d_builtins, d_keywords;
+        QTextCharFormat formatForCategory(int i) const { return d_format[i]; }
+        QTextCharFormat d_format[C_Max];
+    };
+#endif
+
     class LogPainter : public QSyntaxHighlighter
     {
     public:

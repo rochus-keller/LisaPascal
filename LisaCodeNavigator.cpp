@@ -97,6 +97,7 @@ public:
     Symbol* d_goto;
     PascalPainter* d_hl1;
     AsmPainter* d_hl2;
+    // ExecPainter* d_hl3;
     QString d_find;
 
     Viewer(CodeNavigator* p):QPlainTextEdit(p),d_that(p),d_goto(0)
@@ -112,6 +113,7 @@ public:
         foreach( const QByteArray& w, s_keywords )
             d_hl1->addKeyword(w);
         d_hl2 = new AsmPainter( this );
+        //d_hl3 = new ExecPainter(this);
 
 #if defined(Q_OS_WIN32)
         QFont monospace("Consolas");
@@ -139,6 +141,8 @@ public:
             d_hl1->setDocument(document());
         else if( cf && ( cf->d_kind == Thing::Assembler|| cf->d_kind == Thing::AsmIncl ) )
             d_hl2->setDocument(document());
+        else if( cf && cf->d_kind == Thing::Exec )
+            d_hl1->setDocument(document()); // d_hl3
         QByteArray buf = in.readAll();
         buf.chop(1);
         setPlainText( QString::fromLatin1(buf) );
@@ -711,7 +715,8 @@ void CodeNavigator::syncModuleList()
     else
     {
         AsmFile* af = d_mdl->getAsmFile(d_view->d_path);
-        d_mdl2->load( 0, af->d_impl );
+        if( af )
+            d_mdl2->load( 0, af->d_impl );
     }
     d_module->expandAll();
     d_module->scrollToTop();
@@ -775,6 +780,10 @@ void CodeNavigator::onModuleDblClick(const QModelIndex& i)
     }else if( nt->d_kind == Thing::AsmIncl )
     {
         const AsmInclude* f = static_cast<const AsmInclude*>(nt);
+        d_view->loadFile(f->d_file->d_realPath);
+    }else if( nt->d_kind == Thing::Exec )
+    {
+        const ExecFile* f = static_cast<const ExecFile*>(nt);
         d_view->loadFile(f->d_file->d_realPath);
     }
 }
@@ -907,7 +916,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.8.2");
+    a.setApplicationVersion("0.8.3");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX
