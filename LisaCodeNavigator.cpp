@@ -513,7 +513,7 @@ void CodeNavigator::open(const QString& sourceTreePath)
     d_forwardHisto.clear();
     d_dir = sourceTreePath;
     QDir::setCurrent(sourceTreePath);
-   setWindowTitle( tr("%3 - %1 v%2").arg( qApp->applicationName() ).arg( qApp->applicationVersion() )
+    setWindowTitle( tr("%3 - %1 v%2").arg( qApp->applicationName() ).arg( qApp->applicationVersion() )
                     .arg( QDir(sourceTreePath).dirName() ));
     QTimer::singleShot(500,this,SLOT(onRunReload()));
 }
@@ -916,7 +916,7 @@ int main(int argc, char *argv[])
     a.setOrganizationName("me@rochus-keller.ch");
     a.setOrganizationDomain("github.com/rochus-keller/LisaPascal");
     a.setApplicationName("LisaCodeNavigator");
-    a.setApplicationVersion("0.8.3");
+    a.setApplicationVersion("0.8.4");
     a.setStyle("Fusion");
     QFontDatabase::addApplicationFont(":/fonts/DejaVuSansMono.ttf"); 
 #ifdef Q_OS_LINUX

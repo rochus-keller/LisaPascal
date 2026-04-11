@@ -38,8 +38,9 @@ public:
 
         void clear();
         void dump(int level = 0) const;
-        Dir* subdir(const QString& name) const;
-        const File* file(const QString& name) const;
+        Dir* findSubdir(const QString& name) const;
+        const File* findFile(const QString& name) const;
+        const File* findFile(const QStringList& path) const; // dir, dir, ... , file
         const File* module(const QByteArray& nameLc) const;
         Dir():d_dir(0) {}
         ~Dir() { clear(); }
@@ -72,7 +73,7 @@ public:
     QList<const File*> getAllPas() const;
     QList<const File*> getAllAsm() const;
     const File* findFile(const QString& realPath) const;
-    const File* findFile(const Dir* startFrom, const QString& dir, const QString& name) const;
+    const File* findFileInDir(const Dir* startFrom, const QStringList& segments) const;
     const File* findModule(const Dir* startFrom, const QByteArray& nameLc) const;
 
     static FileType detectType(QIODevice* in, QByteArray* = 0);

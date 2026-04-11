@@ -72,7 +72,7 @@ bool FileSystem::load(const QString& rootDir)
     d_fileMap.clear();
     d_moduleMap.clear();
 
-    const QStringList files = collectFiles(dirInfo.absolutePath(),QStringList() << "*.txt" << "*.pas" << "*.inc");
+    const QStringList files = collectFiles(dirInfo.absolutePath(),QStringList() << "*.txt" << "*.text" << "*.pas" << "*.inc");
     const int off = dirInfo.absolutePath().size();
 
     foreach( const QString& f, files )
@@ -96,14 +96,34 @@ bool FileSystem::load(const QString& rootDir)
         const QString fileName = info.fileName().toLower();
 
         QString name;
+        bool verbatim = false;
         if( fileName.endsWith("text.unix.txt") )
         {
+            // file as deployed by the CHM
             name = fileName;
             name.chop(14); // including dot
-        }else
+        }else if( fileName.endsWith(".text"))
+        {
+            // file as converted by Alex
+            name = f.mid(off+1);
+            name.chop(5); // remove suffix including dot
+            verbatim = true;
+       }else
             name = info.baseName();
 
-        QStringList parts = name.contains('-') ? name.split('-') : name.split('.');
+        QStringList parts;
+        if( name.contains('-') )
+            parts = name.split('-');
+        else if( name.contains('/') )
+        {
+            parts = name.split('/');
+            name = parts.last();
+        }else if( name.contains('\\') )
+        {
+            parts = name.split('\\');
+            name = parts.last();
+        }else
+            parts = name.split('.');
 
         File* file = new File();
         file->d_type = fileType;
@@ -139,30 +159,21 @@ bool FileSystem::load(const QString& rootDir)
             dir->d_files.append(file);
         }else if( parts.size() >= 2 )
         {
-            Dir* dir = getDir(replaceLast(relDirPath,parts.front()));
-            parts.pop_front();
-            file->d_name = parts.join('_');
+            Dir* dir;
+            if( verbatim )
+                dir = getDir(relDirPath);
+            else
+                dir = getDir(replaceLast(relDirPath,parts.front()));
+            if( !verbatim )
+            {
+                parts.pop_front();
+                file->d_name = parts.join('_');
+            }
             file->d_dir = dir;
             dir->d_files.append(file);
         }
     }
 
-#if 0
-    // print stats
-    QMap<int,int> count;
-    QHash<QByteArray,QList<File*> >::const_iterator i;
-    for( i = d_moduleMap.begin(); i != d_moduleMap.end(); ++i )
-    {
-        const QList<File*>& hits = i.value();
-        count[hits.size()]++;
-        if( hits.size() > 1 )
-        {
-            for(int j = 0; j < hits.size(); j++ )
-                qDebug() << i.key() << "\t" << hits.size() << "\t" << hits[j]->getVirtualPath();
-        }
-    }
-    qDebug() << count;
-#endif
     return true;
 }
 
@@ -232,25 +243,19 @@ const FileSystem::File*FileSystem::findFile(const QString& realPath) const
     return d_fileMap.value(realPath);
 }
 
-const FileSystem::File*FileSystem::findFile(const Dir* startFrom, const QString& dir, const QString& name) const
+const FileSystem::File*FileSystem::findFileInDir(const Dir* startFrom, const QStringList& segments) const
 {
     Q_ASSERT(startFrom);
+    Q_ASSERT(!segments.isEmpty());
     const File* res = 0;
     const Dir* d = startFrom;
     while( res == 0 && d )
     {
-        if( dir.isEmpty() || d->d_name == dir )
-            res = d->file(name);
-        if( res == 0 && !dir.isEmpty() )
-        {
-            for( int i = 0; i < d->d_subdirs.size(); i++ )
-            {
-                if( d->d_subdirs[i]->d_name == dir )
-                    res = d->d_subdirs[i]->file(name);
-                if( res )
-                    break;
-            }
-        }
+        // start in startFrom directory
+        res = d->findFile(segments);
+        if( res )
+            break;
+        // continue with the outer directory as long as there is one
         d = d->d_dir;
     }
     return res;
@@ -440,7 +445,7 @@ FileSystem::Dir*FileSystem::getDir(const QString& relPath)
     Dir* res = 0;
     for( int i = 0; i < segs.size(); i++ )
     {
-        res = cur->subdir(segs[i]);
+        res = cur->findSubdir(segs[i]);
         if( res == 0 )
         {
             res = new Dir();
@@ -495,7 +500,7 @@ void FileSystem::Dir::dump(int level) const
         d_subdirs[i]->dump(level+1);
 }
 
-FileSystem::Dir*FileSystem::Dir::subdir(const QString& name) const
+FileSystem::Dir*FileSystem::Dir::findSubdir(const QString& name) const
 {
     for(int i = 0; i < d_subdirs.size(); i++ )
         if( d_subdirs[i]->d_name == name )
@@ -503,12 +508,25 @@ FileSystem::Dir*FileSystem::Dir::subdir(const QString& name) const
     return 0;
 }
 
-const FileSystem::File*FileSystem::Dir::file(const QString& name) const
+const FileSystem::File*FileSystem::Dir::findFile(const QString& name) const
 {
     for(int i = 0; i < d_files.size(); i++ )
         if( d_files[i]->d_name == name )
             return d_files[i];
     return 0;
+}
+
+const FileSystem::File *FileSystem::Dir::findFile(const QStringList &path) const
+{
+    if( path.size() > 1 )
+    {
+        Dir* d = findSubdir(path.first());
+        if( d )
+            return d->findFile(path.mid(1));
+        else
+            return 0;
+    }else
+        return findFile(path.last());
 }
 
 const FileSystem::File*FileSystem::Dir::module(const QByteArray& nameLc) const

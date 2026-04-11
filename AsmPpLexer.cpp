@@ -134,16 +134,14 @@ bool PpLexer::handleInclude(Token t)
         }
     }
 
-    QString fileName = path.last();
-    if( fileName.endsWith(".text") )
-        fileName.chop(5);
-    const FileSystem::File* found = 0;
-    // TODO: find can still be improved
-    if( path.size() == 1 )
+    if( path.isEmpty() )
     {
-        found = d_fs->findFile(f->d_dir, QString(), fileName);
-    }else if( path.size() == 2 )
-        found = d_fs->findFile(f->d_dir, path[0], fileName);
+        d_err = QString("invalid include path");
+        return false;
+    }
+    if( path.last().endsWith(".text") )
+        path.last().chop(5);
+    const FileSystem::File* found = d_fs->findFileInDir(f->d_dir, path);
 
     Include inc;
     inc.d_inc = found;

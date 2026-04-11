@@ -232,19 +232,18 @@ bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
     QString path = QString::fromUtf8(data).trimmed().toLower();
     if( path.endsWith(".text") )
         path.chop(5);
+
     const FileSystem::File* f = d_fs->findFile(t.d_sourcePath);
     Q_ASSERT( f );
-    QStringList pathFile = path.split('/');
-    const FileSystem::File* found = 0;
-    if( pathFile.size() == 1 )
+    QStringList segments = path.split('/');
+    // dir/../file
+    if( segments.size() == 1 )
     {
-        QString name = pathFile[0];
-        const int colon = name.indexOf(':');
+        const int colon = segments[0].indexOf(':');
         if( colon != -1 )
-            name = name.mid(colon+1);
-        found = d_fs->findFile(f->d_dir, QString(), name);
-    }else if( pathFile.size() == 2 )
-        found = d_fs->findFile(f->d_dir, pathFile[0], pathFile[1]);
+            segments[0] = segments[0].mid(colon+1);
+    }
+    const FileSystem::File* found = d_fs->findFileInDir(f->d_dir, segments);
 
     Include inc;
     inc.d_inc = found;

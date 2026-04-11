@@ -1596,8 +1596,13 @@ QVariant CodeModel::data(const QModelIndex& index, int role) const
             return static_cast<AsmInclude*>(s->d_thing)->d_file->d_name;
         case Thing::Include:
             return static_cast<IncludeFile*>(s->d_thing)->d_file->d_name;
-        case Thing::Folder:
-            return static_cast<CodeFolder*>(s->d_thing)->d_dir->d_name;
+        case Thing::Folder: {
+            FileSystem::Dir* d = static_cast<CodeFolder*>(s->d_thing)->d_dir;
+            if( d && !d->d_name.isEmpty() )
+                return d->d_name;
+            else
+                return "<root>";
+            }
         }
         break;
     case Qt::DecorationRole:
