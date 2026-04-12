@@ -40,7 +40,7 @@ identifier_list2 ::=
 	identifier [ '/' identifier ] { ',' identifier [ '/' identifier ] }  // apparently legal, seen e.g. in libhw/keyboard
 
 regular_unit ::= 
-	unit_heading ';' [ intrinsic [shared] ';' ] // apparently the sources deviate from the spec for intrinsic
+	unit_heading ';' [ intrinsic [identifier] ';' ] // apparently the sources deviate from the spec for intrinsic; identifier must equal "shared"
 		interface_part implementation_part 
 	[ end '.' ] // end can apparently be left out, as done in some files
 unit_heading ::= 
@@ -115,7 +115,8 @@ method_block ::=
 procedure_declaration ::=
     procedure_heading ';' body_ ';'
 body_ ::= // procedure_body, function_body
-    block statement_part | 'forward' | 'external' | 'inline' constant
+    block statement_part | 'forward'  // TODO: forward is a non-reserved keyword; there are enums and variables called "forward" in Lisa
+    | 'external' | 'inline' constant
 function_declaration ::=
     function_heading ';' body_ ';'
 statement_part ::=

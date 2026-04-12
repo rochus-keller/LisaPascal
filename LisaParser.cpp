@@ -848,8 +848,8 @@ void Parser::regular_unit(SynTree* st) {
 	if( expect(Tok_Semi, false, "regular_unit") ) addTerminal(st);
 	if( la.d_type == Tok_intrinsic ) {
 		if( expect(Tok_intrinsic, false, "regular_unit") ) addTerminal(st);
-		if( la.d_type == Tok_shared ) {
-			if( expect(Tok_shared, false, "regular_unit") ) addTerminal(st);
+        if( la.d_type == Tok_identifier && la.d_val.toLower() == "shared" ) {
+            if( expect(Tok_identifier, false, "regular_unit") ) addTerminal(st);
 		}
 		if( expect(Tok_Semi, false, "regular_unit") ) addTerminal(st);
 	}

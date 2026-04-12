@@ -22,7 +22,7 @@ using namespace Lisa;
 
 PpLexer::PpLexer(FileSystem* fs):d_fs(fs),d_sloc(0)
 {
-    Q_ASSERT(fs);
+    // d_fs may be 0
 }
 
 PpLexer::~PpLexer()
@@ -41,9 +41,12 @@ bool PpLexer::reset(const QString& filePath)
     d_sloc = 0;
     d_includes.clear();
 
-    const FileSystem::File* f = d_fs->findFile(filePath);
-    if( f == 0 )
-        return false;
+    if( d_fs )
+    {
+        const FileSystem::File* f = d_fs->findFile(filePath);
+        if( f == 0 )
+            return false;
+    }
     d_stack.push_back(Level());
     d_stack.back().d_lex.setIgnoreComments(false);
     QFile* file = new QFile(filePath);
@@ -229,6 +232,8 @@ PpLexer::PpSym PpLexer::checkPp(QByteArray& str)
 
 bool PpLexer::handleInclude(const QByteArray& data, const Token& t)
 {
+    if( d_fs == 0 )
+        return false;
     QString path = QString::fromUtf8(data).trimmed().toLower();
     if( path.endsWith(".text") )
         path.chop(5);

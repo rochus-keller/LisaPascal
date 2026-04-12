@@ -658,17 +658,6 @@ namespace Lisa {
 					res = Tok_set; i += 3;
 				}
 				break;
-			case 'h':
-				if( at(str,len,i+2) == 'a' ){
-					if( at(str,len,i+3) == 'r' ){
-						if( at(str,len,i+4) == 'e' ){
-							if( at(str,len,i+5) == 'd' ){
-								res = Tok_shared; i += 6;
-							}
-						}
-					}
-				}
-				break;
 			case 't':
 				if( at(str,len,i+2) == 'r' ){
 					if( at(str,len,i+3) == 'i' ){

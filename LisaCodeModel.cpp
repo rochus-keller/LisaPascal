@@ -1913,10 +1913,8 @@ QByteArrayList UnitFile::findUses() const
     if( d_file == 0 || !(d_file->d_type == FileSystem::PascalProgram ||
                          d_file->d_type == FileSystem::PascalUnit) )
         return res;
-    QFile f(d_file->d_realPath);
-    f.open(QIODevice::ReadOnly);
-    Lexer lex;
-    lex.setStream(&f);
+    PpLexer lex(0); // we need PpLexer here, not just Lexer, because uses might be framed by IFC
+    lex.reset(d_file->d_realPath);
     Token t = lex.nextToken();
     while( t.isValid() )
     {
